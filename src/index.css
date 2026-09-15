@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@theme {
+  --font-bengali: 'Noto Sans Bengali', 'SolaimanLipi', sans-serif;
+  --font-sans: 'Inter', 'Noto Sans Bengali', system-ui, sans-serif;
+  --color-walton-blue: #005697;
+  --color-walton-red: #EE1D23;
+  --color-walton-dark: #0e1726;
+}
+
+body {
+  font-family: 'Inter', 'Noto Sans Bengali', system-ui, sans-serif;
+}
+
+/* Custom Print Rules for Strict A4 Landscape Fit */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 5mm;
+  }
+  
+  html, body {
+    width: 297mm;
+    height: 210mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    overflow: hidden !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  #sop-paper-wrapper {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    width: 100% !important;
+    height: 100% !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  #sop-paper {
+    width: 287mm !important;
+    height: 198mm !important;
+    max-height: 198mm !important;
+    margin: 0 auto !important;
+    box-shadow: none !important;
+    border: 1.5px solid #000 !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    overflow: hidden !important;
+  }
+}
+
+/* Screen Preview Styling */
+.sop-a4-landscape {
+  width: 287mm;
+  min-height: 198mm;
+  max-height: 198mm;
+  background-color: #ffffff;
+  color: #000000;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Custom scrollbars for clean UI */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
