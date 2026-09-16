@@ -9,9 +9,14 @@ import { SafetyEditor } from './components/InputPanel/SafetyEditor';
 import { TablesEditor } from './components/InputPanel/TablesEditor';
 import { SOPPaper } from './components/Preview/SOPPaper';
 import { ApiKeyModal } from './components/Modals/ApiKeyModal';
-import { generateSOPWithGemini, offlineConvertBanglish } from './services/banglishEngine';
+import {
+  generateSOPWithGemini,
+  offlineConvertBanglish,
+  offlineConvertQualityPoints,
+} from './services/banglishEngine';
 import {
   generateSOPWithOpenRouter,
+  generateQualityPointsWithOpenRouter,
   OPENROUTER_API_KEY_STORAGE,
   OPENROUTER_MODEL_STORAGE,
 } from './services/openrouterService';
@@ -68,6 +73,7 @@ export const App: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isGeneratingQuality, setIsGeneratingQuality] = useState<boolean>(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
 
   const importFileRef = useRef<HTMLInputElement>(null);
@@ -268,6 +274,56 @@ export const App: React.FC = () => {
     }
   };
 
+  // Dedicated Critical Quality Points (লক্ষণীয় বিষয়) AI Generation
+  const handleAutoGenerateQuality = async () => {
+    const input = data.procedure.qualityBanglishInput || '';
+    if (!input.trim()) {
+      alert('Please enter your Critical Quality Points in Banglish/English in the box first.');
+      return;
+    }
+
+    setIsGeneratingQuality(true);
+    try {
+      if (openRouterKey.trim()) {
+        const points = await generateQualityPointsWithOpenRouter(
+          input,
+          openRouterKey.trim(),
+          openRouterModel
+        );
+        setData(prev => ({
+          ...prev,
+          procedure: {
+            ...prev.procedure,
+            qualityPoints: points,
+          },
+        }));
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+      } else {
+        const points = offlineConvertQualityPoints(input);
+        setData(prev => ({
+          ...prev,
+          procedure: {
+            ...prev.procedure,
+            qualityPoints: points,
+          },
+        }));
+        confetti({ particleCount: 30, spread: 40, origin: { y: 0.7 } });
+      }
+    } catch (err: any) {
+      alert(`Quality Points AI Notice: ${err.message || 'Error running AI'}. Falling back to offline converter.`);
+      const points = offlineConvertQualityPoints(input);
+      setData(prev => ({
+        ...prev,
+        procedure: {
+          ...prev.procedure,
+          qualityPoints: points,
+        },
+      }));
+    } finally {
+      setIsGeneratingQuality(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-200 text-slate-900 selection:bg-blue-600 selection:text-white">
       {/* Hidden Import Input */}
@@ -419,6 +475,8 @@ export const App: React.FC = () => {
                     onChange={(procedure) => setData({ ...data, procedure })}
                     onGenerate={handleAutoGenerate}
                     isGenerating={isGenerating}
+                    onGenerateQuality={handleAutoGenerateQuality}
+                    isGeneratingQuality={isGeneratingQuality}
                     hasApiKey={Boolean(openRouterKey || geminiKey)}
                     activeProvider={activeProvider}
                     activeModel={openRouterModel}

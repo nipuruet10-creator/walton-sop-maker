@@ -9,6 +9,8 @@ interface BanglishProcedureEditorProps {
   onChange: (procedure: SOPProcedure) => void;
   onGenerate: () => void;
   isGenerating: boolean;
+  onGenerateQuality?: () => void;
+  isGeneratingQuality?: boolean;
   hasApiKey: boolean;
   activeProvider?: 'openrouter' | 'gemini';
   activeModel?: string;
@@ -39,12 +41,14 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
   onChange,
   onGenerate,
   isGenerating,
+  onGenerateQuality,
+  isGeneratingQuality = false,
   hasApiKey,
   activeProvider = 'openrouter',
   activeModel = 'openrouter/free',
   onOpenAiModal,
 }) => {
-  const [autoConvert, setAutoConvert] = useState<boolean>(true);
+  const [autoConvert, setAutoConvert] = useState<boolean>(false);
   const debounceTimerRef = useRef<any>(null);
 
   // Auto-convert on Banglish input change if enabled
@@ -273,10 +277,11 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
       </div>
 
       {/* লক্ষণীয় বিষয় (Quality Points) */}
-      <div className="space-y-2 pt-2 border-t border-slate-200">
+      <div className="space-y-2.5 pt-2 border-t border-slate-200">
         <div className="flex items-center justify-between border-b pb-1">
-          <h3 className="font-bold text-slate-800 text-xs">
-            লক্ষণীয় বিষয় (Critical Quality Points)
+          <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span>লক্ষণীয় বিষয় (Critical Quality Points)</span>
           </h3>
           <button
             type="button"
@@ -285,6 +290,55 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
           >
             <Plus className="w-3 h-3" /> Add Point
           </button>
+        </div>
+
+        {/* Dedicated Quality Points AI Generator Box */}
+        <div className="bg-slate-900 text-slate-100 p-3 rounded-xl border border-slate-800 shadow-sm space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="font-bold text-amber-300 flex items-center gap-1.5 text-xs">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Banglish Input (লক্ষণীয় বিষয় AI Generator)</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                const sample = `1) belt laganor somoy nissit korte hobe jate cartoon chire na jay (chobi-6).
+2) tape boshonor somoy kheyal rakhte hobe jate tape baka na hoy ebong sojasuji thake.
+3) protiti jaygay 1 layer tape shothikbhabe deya hoyese kina check korte hobe.`;
+                onChange({ ...procedure, qualityBanglishInput: sample });
+              }}
+              className="text-[10px] bg-slate-800 hover:bg-slate-700 text-amber-300 px-2 py-0.5 rounded border border-slate-700 transition cursor-pointer flex items-center gap-1"
+            >
+              <BookmarkCheck className="w-2.5 h-2.5" />
+              <span>স্যাম্পল দিন</span>
+            </button>
+          </div>
+
+          <textarea
+            value={procedure.qualityBanglishInput || ''}
+            onChange={(e) => onChange({ ...procedure, qualityBanglishInput: e.target.value })}
+            rows={3}
+            placeholder="এখানে লক্ষণীয় বিষয় বা চেকিং পয়েন্ট বাংলিশ/ইংরেজিতে লিখুন... যেমন:
+1) belt laganor somoy nissit korte hobe jate cartoon chire na jay (chobi-6).
+2) tape boshonor somoy kheyal rakhte hobe jate tape baka na hoy ebong sojasuji thake..."
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 placeholder:text-slate-500 font-mono focus:outline-none focus:border-amber-500 resize-y leading-relaxed"
+          />
+
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            <span className="text-[11px] text-slate-400">
+              {hasApiKey ? 'OpenRouter AI দিয়ে সম্পূর্ণ বাংলায় অনুবাদ হবে' : 'অফলাইন ইঞ্জিন দিয়ে বাংলায় রূপান্তর হবে'}
+            </span>
+
+            <button
+              type="button"
+              onClick={onGenerateQuality}
+              disabled={isGeneratingQuality || !procedure.qualityBanglishInput?.trim()}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 disabled:from-slate-700 disabled:to-slate-700 text-white px-3 py-1.5 rounded-lg font-bold transition cursor-pointer disabled:cursor-not-allowed shadow-md text-xs shrink-0"
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${isGeneratingQuality ? 'animate-spin text-yellow-200' : 'text-yellow-200'}`} />
+              <span>{isGeneratingQuality ? 'AI অনুবাদ হচ্ছে...' : 'AI Generate Quality Points'}</span>
+            </button>
+          </div>
         </div>
 
         <div className="space-y-1.5">

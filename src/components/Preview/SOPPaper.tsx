@@ -71,9 +71,9 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
             {/* Logo and Company Name */}
             <div className="flex items-center gap-4 px-4 py-2 bg-white min-h-[46px]">
               <img
-                src={header.logoUrl || '/logo-walton.svg'}
-                alt="Logo"
-                className="h-9 w-auto max-w-[130px] object-contain shrink-0"
+                src={header.logoUrl || '/walton-logo.png'}
+                alt="Walton Logo"
+                className="h-10 w-auto max-w-[140px] object-contain shrink-0"
               />
               <span className="font-extrabold text-[17px] tracking-wide text-[#005697] font-sans">
                 {header.companyName}

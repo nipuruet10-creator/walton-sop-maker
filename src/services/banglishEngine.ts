@@ -75,10 +75,37 @@ const phraseDictionary: [RegExp, string | ReplacementFn][] = [
   [/\b(?:kajer\s*sheshe)\b/gi, 'কাজের শেষে'],
   [/\b(?:sokol\s*proyojoniyo)\b/gi, 'সকল প্রয়োজনীয়'],
   [/\b(?:line\s*supervisor|supervisor|supervisorke)\b/gi, 'লাইন সুপারভাইজারকে'],
+
+  // Critical phrases from user feedback (ensuring 100% translation without leftover Banglish words)
+  [/\b(?:eta|eita)\s*(?:nissit|nishchit|nischit|nisshit)\s*korte\s*hobe\s*(?:je)?\b/gi, 'এটি নিশ্চিত করতে হবে যে'],
+  [/\b(?:nissit|nishchit|nischit|nisshit)\s*korte\s*hobe\s*(?:je)?\b/gi, 'নিশ্চিত করতে হবে যে'],
+  [/\b(?:2|dui)\s*layer\s*e\s*tape\s*dite\s*hobe\b/gi, '২ লেয়ারে টেপ দিতে হবে'],
+  [/\b(?:2|dui)\s*layer\s*tape\s*deya\s*(?:hoyese|hoyeche|hoise)\b/gi, '২ লেয়ার টেপ দেওয়া হয়েছে'],
+  [/\b([0-9]+)\s*layer\s*e\b/gi, (_: string, n: string) => `${toBengaliNumber(parseInt(n, 10))} লেয়ারে`],
+  [/\b([0-9]+)\s*layer\b/gi, (_: string, n: string) => `${toBengaliNumber(parseInt(n, 10))} লেয়ার`],
+  [/\b(?:tape\s*dite\s*hobe)\b/gi, 'টেপ দিতে হবে'],
+  [/\b(?:deya\s*hoyese|deya\s*hoyeche|deoya\s*hoyese|deoya\s*hoyeche|deya\s*hoise)\b/gi, 'দেওয়া হয়েছে'],
+  [/\b(?:lagano\s*hoyese|lagano\s*hoyeche)\b/gi, 'লাগানো হয়েছে'],
+  [/\b(?:boshano\s*hoyese|boshano\s*hoyeche)\b/gi, 'বসানো হয়েছে'],
 ];
 
 // 2. Comprehensive Word-Level Dictionary (Banglish & English words mapped to formal Bengali)
 const wordMap: Record<string, string> = {
+  // Verification, Clauses & Adverbs
+  nissit: 'নিশ্চিত',
+  nischit: 'নিশ্চিত',
+  nisshit: 'নিশ্চিত',
+  eta: 'এটি',
+  eita: 'এটি',
+  eiti: 'এটি',
+  je: 'যে',
+  zate: 'যাতে',
+  hoyese: 'হয়েছে',
+  hoyeche: 'হয়েছে',
+  hoise: 'হয়েছে',
+  layere: 'লেয়ারে',
+  tapeti: 'টেপটি',
+
   // Common action verbs & steps
   prothome: 'প্রথমে',
   first: 'প্রথমে',
@@ -381,6 +408,64 @@ function cleanBanglaFormatting(text: string): string {
 }
 
 /**
+ * Translates a single line of Banglish / English text to pure Bengali
+ */
+export function translateSingleLine(line: string): string {
+  // 1. Strip leading numbering: "1.", "1)", "(1)", "step 1:", "১)", etc.
+  let cleaned = line.replace(/^(\d+[\.\)\-:]|\([0-9]+\)|step\s*\d+:?|[০-৯]+[\)\.\-:])\s*/i, '');
+
+  // 2. Pass 1: Apply Multi-word Phrase Dictionary
+  for (const [pattern, replacement] of phraseDictionary) {
+    if (typeof replacement === 'string') {
+      cleaned = cleaned.replace(pattern, replacement);
+    } else if (typeof replacement === 'function') {
+      cleaned = cleaned.replace(pattern, replacement as any);
+    }
+  }
+
+  // 3. Pass 2: Word-by-word token translation
+  cleaned = cleaned
+    .split(/(\s+|[.,;!?()]+)/)
+    .map(token => {
+      if (!token.trim() || /^[.,;!?()]+$/.test(token)) return token;
+
+      const lower = token.toLowerCase();
+      if (wordMap[lower]) {
+        return wordMap[lower];
+      }
+
+      // Suffix handling: e.g. 'shothikbhabe', 'shothikhbabe', 'shothikbabe'
+      if (/(?:bhabe|vabe|babe|vhabe)$/i.test(lower)) {
+        const stem = lower.replace(/(?:bhabe|vabe|babe|vhabe)$/i, '');
+        if (wordMap[stem]) return `${wordMap[stem]}ভাবে`;
+        if (/^s+h?o+t+h?i+k+h?$/i.test(stem)) return 'সঠিকভাবে';
+        if (/^valo|^bhalo/i.test(stem)) return 'ভালোভাবে';
+        if (/^shundor|^sundor/i.test(stem)) return 'সুন্দরভাবে';
+      }
+      if (lower.endsWith('er')) {
+        const stem = lower.slice(0, -2);
+        if (wordMap[stem]) return `${wordMap[stem]}ের`;
+      }
+      if (lower.endsWith('e') && lower.length > 2) {
+        const stem = lower.slice(0, -1);
+        if (wordMap[stem]) return `${wordMap[stem]}ে`;
+      }
+
+      return phoneticWord(token);
+    })
+    .join('');
+
+  // 4. Convert isolated English digits to Bengali numerals
+  cleaned = cleaned.replace(/\b(\d+)\b/g, (match) => {
+    const val = parseInt(match, 10);
+    return toBengaliNumber(val);
+  });
+
+  // 5. Final Polish: Clean danda and formatting
+  return cleanBanglaFormatting(cleaned);
+}
+
+/**
  * Intelligent Offline Banglish to 100% Pure Bengali Converter
  */
 export function offlineConvertBanglish(input: string): GeneratedSOPContent {
@@ -410,58 +495,7 @@ export function offlineConvertBanglish(input: string): GeneratedSOPContent {
   }
 
   const steps: string[] = lines.map((line, index) => {
-    // 1. Strip leading numbering: "1.", "1)", "(1)", "step 1:", "১)", etc.
-    let cleaned = line.replace(/^(\d+[\.\)\-:]|\([0-9]+\)|step\s*\d+:?|[০-৯]+[\)\.\-:])\s*/i, '');
-
-    // 2. Pass 1: Apply Multi-word Phrase Dictionary
-    for (const [pattern, replacement] of phraseDictionary) {
-      if (typeof replacement === 'string') {
-        cleaned = cleaned.replace(pattern, replacement);
-      } else if (typeof replacement === 'function') {
-        cleaned = cleaned.replace(pattern, replacement as any);
-      }
-    }
-
-    // 3. Pass 2: Word-by-word token translation
-    cleaned = cleaned
-      .split(/(\s+|[.,;!?()]+)/)
-      .map(token => {
-        if (!token.trim() || /^[.,;!?()]+$/.test(token)) return token;
-
-        const lower = token.toLowerCase();
-        if (wordMap[lower]) {
-          return wordMap[lower];
-        }
-
-        // Suffix handling: e.g. 'shothikbhabe', 'shothikhbabe', 'shothikbabe'
-        if (/(?:bhabe|vabe|babe|vhabe)$/i.test(lower)) {
-          const stem = lower.replace(/(?:bhabe|vabe|babe|vhabe)$/i, '');
-          if (wordMap[stem]) return `${wordMap[stem]}ভাবে`;
-          if (/^s+h?o+t+h?i+k+h?$/i.test(stem)) return 'সঠিকভাবে';
-          if (/^valo|^bhalo/i.test(stem)) return 'ভালোভাবে';
-          if (/^shundor|^sundor/i.test(stem)) return 'সুন্দরভাবে';
-        }
-        if (lower.endsWith('er')) {
-          const stem = lower.slice(0, -2);
-          if (wordMap[stem]) return `${wordMap[stem]}ের`;
-        }
-        if (lower.endsWith('e') && lower.length > 2) {
-          const stem = lower.slice(0, -1);
-          if (wordMap[stem]) return `${wordMap[stem]}ে`;
-        }
-
-        return phoneticWord(token);
-      })
-      .join('');
-
-    // 4. Convert isolated English digits to Bengali numerals
-    cleaned = cleaned.replace(/\b(\d+)\b/g, (match) => {
-      const val = parseInt(match, 10);
-      return toBengaliNumber(val);
-    });
-
-    // 5. Final Polish: Clean danda and formatting
-    cleaned = cleanBanglaFormatting(cleaned);
+    const cleaned = translateSingleLine(line);
     const prefix = `${toBengaliNumber(index + 1)}) `;
     return `${prefix}${cleaned}`;
   });
@@ -581,3 +615,24 @@ You MUST reply ONLY with valid JSON in this exact structure without markdown for
     throw error;
   }
 }
+
+/**
+ * Offline converter for Critical Quality Points
+ */
+export function offlineConvertQualityPoints(text: string): string[] {
+  if (!text || !text.trim()) return [];
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const points: string[] = [];
+  lines.forEach((line, idx) => {
+    const cleanLine = line.replace(/^([০-৯\d]+[\)\.\-:]\s*)/, '').trim();
+    if (!cleanLine) return;
+    const translated = translateSingleLine(cleanLine);
+    points.push(`${toBengaliNumber(idx + 1)}) ${translated}`);
+  });
+  return points;
+}
+

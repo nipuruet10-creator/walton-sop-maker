@@ -166,19 +166,20 @@ There are ${numPhotos} attached photos numbered from চিত্র-১ to চ�
 
 CRITICAL LANGUAGE & FORMATTING RULES:
 1. Output MUST BE 100% PURE FORMAL MANUFACTURING BENGALI (সম্পূর্ণ প্রমিত বাংলা).
-2. DO NOT leave ANY English words, Banglish words, or English particles (e.g., NEVER output 'er', 'e', 'te', 'ti', 'dite hobe', 'valo vabe', 'korte hobe', 'every', 'kartun', 'sothik vabe', 'lagay nite hobe').
-3. Translate all technical terms naturally into Bengali (e.g. 'প্যাকেজিং টেপ ডিসপেনসার', 'কার্টুনের চিহ্নিত স্থানে', 'ভালোভাবে বসাতে হবে', 'BOPP টেপ', 'পেট বেল্ট মেশিন', 'সঠিকভাবে লাগিয়ে নিতে হবে', 'রেফ্রিজারেটর ডোর গ্রুভ', 'রাবার গ্যাসকেট', 'ম্যাগনেটিক সিল').
+2. DO NOT leave ANY English words, Banglish words, or English particles (e.g., NEVER output 'er', 'e', 'te', 'ti', 'dite hobe', 'valo vabe', 'korte hobe', 'every', 'kartun', 'sothik vabe', 'lagay nite hobe', 'layer', 'eta', 'nissit').
+3. Translate all technical terms naturally into Bengali (e.g. 'প্যাকেজিং টেপ ডিসপেনসার', 'কার্টুনের চিহ্নিত স্থানে', 'ভালোভাবে বসাতে হবে', 'BOPP টেপ', 'পেট বেল্ট মেশিন', 'সঠিকভাবে লাগিয়ে নিতে হবে', 'রেফ্রিজারেটর ডোর গ্রুভ', 'রাবার গ্যাসকেট', 'ম্যাগনেটিক সিল', '২ লেয়ার').
 4. Standard industrial acronyms (BOPP, PET, IDU, CAC, BTU, SL) can remain in uppercase Latin characters.
 5. Every step must start with Bengali numbering: ১), ২), ৩), etc.
 6. If referring to a photo at the beginning of a step, write 'চিত্র-৩ অনুযায়ী' or 'চিত্র-৪ এ দেখানো অনুযায়ী,'.
 7. If referring to a photo at the end of a step, write in single parentheses followed by danda: '...বসাতে হবে (চিত্র-১)।'. NEVER output double parentheses like '((চিত্র-১))' and NEVER output double dandas like '।।'.
-8. Generate 2 to 4 crucial quality inspection points ('লক্ষণীয় বিষয়') numbered ১), ২), etc.
-9. Generate 2 to 3 standard industrial general instructions ('সাধারণ নির্দেশনা') regarding 5S, electricity savings, and line supervisor communication.
+8. ZERO INFORMATION LOSS: Translate EVERY sentence and clause provided in each step! For example, if step 1 has '1) prothome Packaging Tape Dispenser theke 200 mm lomba BOPP tape kete nite hobe. sothik vabe lagay nite hobe. 2 layer e tape dite hobe. eta nissit korte hobe je 2 layer tape deya hoyese.', ALL 4 sentences must be translated: '১) প্রথমে প্যাকেজিং টেপ ডিসপেনসার থেকে ২০০ মিলিমিটার লম্বা BOPP টেপ কেটে নিতে হবে এবং সঠিকভাবে লাগিয়ে নিতে হবে। ২ লেয়ারে টেপ দিতে হবে এবং নিশ্চিত করতে হবে যে ২ লেয়ার টেপ সঠিকভাবে লাগানো হয়েছে।' NEVER omit or leave any sentence in Banglish!
+9. Generate 2 to 4 crucial quality inspection points ('লক্ষণীয় বিষয়') numbered ১), ২), etc.
+10. Generate 2 to 3 standard industrial general instructions ('সাধারণ নির্দেশনা') regarding 5S, electricity savings, and line supervisor communication.
 
 You MUST respond ONLY with a valid JSON object in this exact structure, with NO markdown backticks, NO markdown formatting, NO conversational intro/outro text:
 {
   "steps": [
-    "১) প্রথমে প্যাকেজিং টেপ ডিসপেনসার থেকে ২০০ মিলিমিটার লম্বা BOPP টেপ কেটে নিতে হবে এবং সঠিকভাবে লাগিয়ে নিতে হবে।",
+    "১) প্রথমে প্যাকেজিং টেপ ডিসপেনসার থেকে ২০০ মিলিমিটার লম্বা BOPP টেপ কেটে নিতে হবে এবং সঠিকভাবে লাগিয়ে নিতে হবে। ২ লেয়ারে টেপ দিতে হবে এবং নিশ্চিত করতে হবে যে ২ লেয়ার টেপ সঠিকভাবে লাগানো হয়েছে।",
     "২) ক্যাসেট ইনডোর কার্টুনের চিহ্নিত স্থানে সঠিকভাবে টেপটি বসাতে হবে (চিত্র-১)।",
     "৩) ইনডোর কার্টুনের প্রতিটি টেপিং স্থানে এক লেয়ার BOPP টেপ ব্যবহার করতে হবে (চিত্র-২)।",
     "৪) চিত্র-৩ অনুযায়ী ক্যাসেট ইনডোর কার্টুনের নিচের দিকে BOPP টেপ ব্যবহার করতে হবে।",
@@ -268,4 +269,97 @@ You MUST respond ONLY with a valid JSON object in this exact structure, with NO 
     qualityPoints: (parsed.qualityPoints || []).map(cleanBengaliResult),
     generalInstructions: (parsed.generalInstructions || []).map(cleanBengaliResult),
   };
+}
+
+/**
+ * Generate 100% Pure Bengali Critical Quality Points (লক্ষণীয় বিষয়)
+ */
+export async function generateQualityPointsWithOpenRouter(
+  qualityBanglishInput: string,
+  apiKey: string,
+  model: string = 'openrouter/free'
+): Promise<string[]> {
+  if (!apiKey || !apiKey.trim()) {
+    throw new Error('OpenRouter API Key is missing. Please set your API key in AI settings.');
+  }
+
+  const systemPrompt = `You are a Senior Industrial Quality Control Engineer at Walton Hi-Tech Industries PLC.
+You create crucial quality inspection points ('লক্ষণীয় বিষয় / Critical Quality Points') in 100% PURE, FLAWLESS MANUFACTURING BENGALI (সম্পূর্ণ প্রমিত বাংলা).
+User gives quality requirements or checkpoints in Banglish or English.
+
+RULES:
+1. Output MUST BE 100% PURE FORMAL MANUFACTURING BENGALI.
+2. Translate all instructions cleanly. Every point must start with ১), ২), ৩) etc.
+3. If photo references exist (chobi-1, pic 2), convert to (চিত্র-১), (চিত্র-২) at end of sentence.
+4. Respond ONLY with a valid JSON object:
+{
+  "qualityPoints": [
+    "১) বেল্ট লাগানোর সময় নিশ্চিত করতে হবে যাতে কার্টুন ছিঁড়ে না যায় (চিত্র-৬)।",
+    "২) টেপ বসানোর সময় খেয়াল রাখতে হবে, যাতে টেপ বাঁকা না হয় এবং সোজাসুজি থাকে।",
+    "৩) প্রতিটি জায়গায় এক লেয়ার টেপ সঠিকভাবে দেওয়া হয়েছে কিনা তা যাচাই করতে হবে।"
+  ]
+}`;
+
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey.trim()}`,
+      'HTTP-Referer': window.location.origin || 'http://localhost:3000',
+      'X-Title': 'Walton SOP Maker',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: model || 'openrouter/free',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        {
+          role: 'user',
+          content: `Translate and refine these Critical Quality Points into formal Bengali:\n"""\n${qualityBanglishInput}\n"""`,
+        },
+      ],
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+    }),
+  });
+
+  if (!response.ok) {
+    let errMsg = `OpenRouter API Error: HTTP ${response.status}`;
+    try {
+      const errJson = await response.json();
+      errMsg = errJson?.error?.message || errMsg;
+    } catch {
+      const errText = await response.text();
+      if (errText) errMsg = `${errMsg} - ${errText.slice(0, 200)}`;
+    }
+    throw new Error(errMsg);
+  }
+
+  const data = await response.json();
+  const rawContent = data?.choices?.[0]?.message?.content;
+  if (!rawContent) {
+    throw new Error('Received empty response from AI model.');
+  }
+
+  let cleanJson = rawContent.trim();
+  const jsonMatch = cleanJson.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (jsonMatch) cleanJson = jsonMatch[1].trim();
+
+  let parsed: any;
+  try {
+    parsed = JSON.parse(cleanJson);
+  } catch {
+    const firstBrace = cleanJson.indexOf('{');
+    const lastBrace = cleanJson.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1) {
+      parsed = JSON.parse(cleanJson.substring(firstBrace, lastBrace + 1));
+    } else {
+      throw new Error('AI returned invalid format.');
+    }
+  }
+
+  if (!Array.isArray(parsed.qualityPoints)) {
+    throw new Error('AI did not return quality points array.');
+  }
+
+  return parsed.qualityPoints.map(cleanBengaliResult);
 }

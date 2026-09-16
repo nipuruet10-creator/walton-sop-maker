@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 
 export async function downloadSOPAsPdf(elementId: string = 'sop-paper', processName: string = 'walton_sop') {
   const element = document.getElementById(elementId);
@@ -8,13 +8,20 @@ export async function downloadSOPAsPdf(elementId: string = 'sop-paper', processN
     return;
   }
 
-  // Create high-resolution canvas capture
+  // High DPI capture with html2canvas-pro (full support for oklch, lab, modern CSS colors)
   const canvas = await html2canvas(element, {
     scale: 2.5, // High DPI capture for crisp text and sharp photos
     useCORS: true,
     logging: false,
     backgroundColor: '#ffffff',
     windowWidth: element.scrollWidth,
+    onclone: (clonedDoc) => {
+      // Ensure all SVGs and fonts are rendered cleanly
+      const svgs = clonedDoc.querySelectorAll('svg');
+      svgs.forEach((svg) => {
+        svg.setAttribute('shape-rendering', 'geometricPrecision');
+      });
+    },
   });
 
   const imgData = canvas.toDataURL('image/jpeg', 0.95);

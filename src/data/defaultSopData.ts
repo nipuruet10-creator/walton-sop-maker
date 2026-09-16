@@ -21,7 +21,7 @@ const sampleImages = offlineSampleImages;
 export const defaultSopData: SOPDocument = {
   header: {
     companyName: 'Walton Hi-Tech Industries PLC.',
-    logoUrl: '/logo-walton.svg',
+    logoUrl: '/walton-logo.png',
     processName: 'BOPP Tape Attaching Working Procedure on Cassette IDU',
     model: 'All Cassette IDU',
     stationLine: 'CAC IDU Assembly Line',
@@ -61,6 +61,9 @@ export const defaultSopData: SOPDocument = {
 4) chobi-3 onujayi Cassette indoor cartoon er nicher dike BOPP tape use korte hobe.
 5) chobi-4 e dekhano onujayi, cartoon er ubhoy pashe 4 ti kore mot 8 ti nirdishto sthane BOPP tape use korte hobe.
 6) chobi-5 onusare PET belt machine e 3 setting kore cartoone shothikbabe belt dite hobe.`,
+    qualityBanglishInput: `1) belt laganor somoy nissit korte hobe jate cartoon chire na jay (chobi-6).
+2) tape boshonor somoy kheyal rakhte hobe, jate tape baka na hoy ebong sojasuji thake.
+3) protiti jaygay 1 layer tape shothikbhabe deya hoyese kina check korte hobe.`,
     steps: [
       '১) প্রথমে প্যাকেজিং টেপ ডিসপেনসার থেকে ২০০ মিলিমিটার লম্বা BOPP টেপ কেটে নিতে হবে। সঠিকভাবে লাগিয়ে নিতে হবে।',
       '২) ক্যাসেট ইনডোর কার্টুনের চিহ্নিত স্থানে সঠিকভাবে টেপটি বসাতে হবে (চিত্র-১)।',

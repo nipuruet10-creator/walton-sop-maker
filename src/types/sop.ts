@@ -37,6 +37,7 @@ export interface SOPHeader {
 
 export interface SOPProcedure {
   banglishInput: string;
+  qualityBanglishInput?: string;
   steps: string[];
   qualityPoints: string[];
   generalInstructions: string[];

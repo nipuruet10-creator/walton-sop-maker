@@ -40,8 +40,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     <header className="no-print bg-slate-900 text-white border-b border-slate-800 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-md sticky top-0 z-40">
       {/* Brand & Title */}
       <div className="flex items-center gap-3">
-        <div className="bg-white p-1.5 rounded flex items-center justify-center shadow-inner">
-          <img src="/logo-walton.svg" alt="Walton Logo" className="h-6 object-contain" />
+        <div className="bg-white p-1 rounded flex items-center justify-center shadow-inner">
+          <img src="/walton-logo.png" alt="Walton Logo" className="h-7 object-contain" />
         </div>
         <div>
           <div className="flex items-center gap-2">
