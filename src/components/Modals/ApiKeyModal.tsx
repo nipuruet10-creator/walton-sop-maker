@@ -4,6 +4,7 @@ import {
   fetchFreeOpenRouterModels,
   DEFAULT_FREE_MODELS,
   type OpenRouterModel,
+  testOpenRouterKey,
 } from '../../services/openrouterService';
 
 interface ApiKeyModalProps {
@@ -40,6 +41,24 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [fetchSuccessMsg, setFetchSuccessMsg] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [isTestingKey, setIsTestingKey] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const handleTestKey = async () => {
+    setIsTestingKey(true);
+    setTestResult(null);
+    try {
+      const res = await testOpenRouterKey(orKey);
+      setTestResult(res);
+      if (res.success) {
+        handleFetchModels(orKey);
+      }
+    } catch (err: any) {
+      setTestResult({ success: false, message: err.message || 'Connection test failed.' });
+    } finally {
+      setIsTestingKey(false);
+    }
+  };
 
   // Sync state when modal opens
   useEffect(() => {
@@ -149,8 +168,11 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                 <p className="font-semibold text-blue-900 flex items-center gap-1.5 mb-1">
                   <span>⚡ OpenRouter Free AI Access</span>
                 </p>
-                <p className="text-slate-600">
+                <p className="text-slate-600 mb-1.5">
                   OpenRouter allows you to use top AI models like <strong>Gemma, Llama 3.3, DeepSeek, Qwen</strong> completely free. Your API key stays private in your browser’s local storage.
+                </p>
+                <p className="text-[11px] text-emerald-800 bg-emerald-50/80 p-1.5 rounded-lg border border-emerald-200/60 font-medium">
+                  💡 <strong>টিপস:</strong> কোনো API Key ছাড়াও আমাদের বিল্ট-ইন বাংলা ইঞ্জিন ১০০% শুদ্ধ বাংলায় রূপান্তর করতে পারে। অতিরিক্ত AI শক্তি চাইলে একটি ফ্রি কী যুক্ত করতে পারেন।
                 </p>
               </div>
 
@@ -173,7 +195,10 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                   <input
                     type={showKey ? 'text' : 'password'}
                     value={orKey}
-                    onChange={(e) => setOrKey(e.target.value)}
+                    onChange={(e) => {
+                      setOrKey(e.target.value);
+                      setTestResult(null);
+                    }}
                     placeholder="sk-or-v1-..."
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg pl-3 pr-9 py-2 text-xs font-mono focus:outline-none focus:border-blue-500 transition"
                   />
@@ -185,6 +210,34 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                     {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
                 </div>
+
+                {/* Key Test Action & Feedback */}
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-[10.5px] text-slate-500">
+                    {orKey.trim() ? 'কী চেক করে দেখতে পারেন:' : 'কী থাকলে কানেকশন টেস্ট করুন:'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleTestKey}
+                    disabled={isTestingKey || !orKey.trim()}
+                    className="text-[10.5px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-0.8 rounded-md font-medium cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    <RefreshCw className={`w-2.5 h-2.5 ${isTestingKey ? 'animate-spin' : ''}`} />
+                    <span>{isTestingKey ? 'চেক হচ্ছে...' : 'টেস্ট কী (Test Key)'}</span>
+                  </button>
+                </div>
+
+                {testResult && (
+                  <div
+                    className={`mt-1.5 p-2 rounded-lg text-[11px] flex items-center gap-1.5 border ${
+                      testResult.success
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : 'bg-rose-50 text-rose-800 border-rose-200'
+                    }`}
+                  >
+                    <span>{testResult.message}</span>
+                  </div>
+                )}
               </div>
 
               {/* Model Auto-Fetch and Selector */}

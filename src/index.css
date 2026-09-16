@@ -1,15 +1,29 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'Nirmala UI';
+  src: local('Nirmala UI'), local('NirmalaUI'), local('Nirmala');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Nirmala UI';
+  src: local('Nirmala UI Bold'), local('NirmalaUI-Bold'), local('Nirmala-Bold');
+  font-weight: 700;
+  font-style: normal;
+}
+
 @theme {
-  --font-bengali: 'Noto Sans Bengali', 'SolaimanLipi', sans-serif;
-  --font-sans: 'Inter', 'Noto Sans Bengali', system-ui, sans-serif;
+  --font-bengali: 'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', 'Tiro Bangla', 'Vrinda', sans-serif;
+  --font-sans: 'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', 'Inter', 'Vrinda', system-ui, sans-serif;
   --color-walton-blue: #005697;
   --color-walton-red: #EE1D23;
   --color-walton-dark: #0e1726;
 }
 
 body {
-  font-family: 'Inter', 'Noto Sans Bengali', system-ui, sans-serif;
+  font-family: 'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', 'Inter', system-ui, sans-serif;
 }
 
 /* Custom Print Rules for Strict A4 Landscape Fit */
@@ -62,7 +76,8 @@ body {
 }
 
 /* Screen Preview Styling */
-.sop-a4-landscape {
+.sop-a4-landscape,
+#sop-paper {
   width: 287mm;
   min-height: 198mm;
   max-height: 198mm;
@@ -70,6 +85,9 @@ body {
   color: #000000;
   box-sizing: border-box;
   overflow: hidden;
+  font-family: 'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', 'Vrinda', 'Tiro Bangla', Arial, sans-serif !important;
+  letter-spacing: 0.015px;
+  word-spacing: normal;
 }
 
 /* Custom scrollbars for clean UI */

@@ -172,14 +172,14 @@ CRITICAL LANGUAGE & FORMATTING RULES:
 5. Every step must start with Bengali numbering: ১), ২), ৩), etc.
 6. If referring to a photo at the beginning of a step, write 'চিত্র-৩ অনুযায়ী' or 'চিত্র-৪ এ দেখানো অনুযায়ী,'.
 7. If referring to a photo at the end of a step, write in single parentheses followed by danda: '...বসাতে হবে (চিত্র-১)।'. NEVER output double parentheses like '((চিত্র-১))' and NEVER output double dandas like '।।'.
-8. ZERO INFORMATION LOSS: Translate EVERY sentence and clause provided in each step! For example, if step 1 has '1) prothome Packaging Tape Dispenser theke 200 mm lomba BOPP tape kete nite hobe. sothik vabe lagay nite hobe. 2 layer e tape dite hobe. eta nissit korte hobe je 2 layer tape deya hoyese.', ALL 4 sentences must be translated: '১) প্রথমে প্যাকেজিং টেপ ডিসপেনসার থেকে ২০০ মিলিমিটার লম্বা BOPP টেপ কেটে নিতে হবে এবং সঠিকভাবে লাগিয়ে নিতে হবে। ২ লেয়ারে টেপ দিতে হবে এবং নিশ্চিত করতে হবে যে ২ লেয়ার টেপ সঠিকভাবে লাগানো হয়েছে।' NEVER omit or leave any sentence in Banglish!
+8. ZERO INFORMATION LOSS: Translate EVERY sentence and clause provided in each step! For example, if step 1 has '1) prothome Packaging Tape Dispenser theke 200 mm lomba BOPP tape kete nite hobe. sothik vabe lagay nite hobe. 2 layer hosse kina seta check dite hobe.', ALL clauses must be translated: '১) প্রথমে প্যাকেজিং টেপ ডিসপেনসার থেকে ২০০ মিলিমিটার লম্বা BOPP টেপ কেটে নিতে হবে এবং সঠিকভাবে লাগিয়ে নিতে হবে। ২ লেয়ার হচ্ছে কিনা তা যাচাই করতে হবে।' NEVER omit or leave any sentence or clause in Banglish!
 9. Generate 2 to 4 crucial quality inspection points ('লক্ষণীয় বিষয়') numbered ১), ২), etc.
 10. Generate 2 to 3 standard industrial general instructions ('সাধারণ নির্দেশনা') regarding 5S, electricity savings, and line supervisor communication.
 
 You MUST respond ONLY with a valid JSON object in this exact structure, with NO markdown backticks, NO markdown formatting, NO conversational intro/outro text:
 {
   "steps": [
-    "১) প্রথমে প্যাকেজিং টেপ ডিসপেনসার থেকে ২০০ মিলিমিটার লম্বা BOPP টেপ কেটে নিতে হবে এবং সঠিকভাবে লাগিয়ে নিতে হবে। ২ লেয়ারে টেপ দিতে হবে এবং নিশ্চিত করতে হবে যে ২ লেয়ার টেপ সঠিকভাবে লাগানো হয়েছে।",
+    "১) প্রথমে প্যাকেজিং টেপ ডিসপেনসার থেকে ২০০ মিলিমিটার লম্বা BOPP টেপ কেটে নিতে হবে এবং সঠিকভাবে লাগিয়ে নিতে হবে। ২ লেয়ার হচ্ছে কিনা তা যাচাই করতে হবে।",
     "২) ক্যাসেট ইনডোর কার্টুনের চিহ্নিত স্থানে সঠিকভাবে টেপটি বসাতে হবে (চিত্র-১)।",
     "৩) ইনডোর কার্টুনের প্রতিটি টেপিং স্থানে এক লেয়ার BOPP টেপ ব্যবহার করতে হবে (চিত্র-২)।",
     "৪) চিত্র-৩ অনুযায়ী ক্যাসেট ইনডোর কার্টুনের নিচের দিকে BOPP টেপ ব্যবহার করতে হবে।",
@@ -362,4 +362,38 @@ RULES:
   }
 
   return parsed.qualityPoints.map(cleanBengaliResult);
+}
+
+/**
+ * Test if the OpenRouter API key is valid
+ */
+export async function testOpenRouterKey(apiKey: string): Promise<{ success: boolean; message: string }> {
+  if (!apiKey || !apiKey.trim()) {
+    return { success: false, message: 'দয়া করে প্রথমে একটি API Key প্রবেশ করান।' };
+  }
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/auth/key', {
+      headers: {
+        Authorization: `Bearer ${apiKey.trim()}`,
+      },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const label = data?.data?.label || 'API Key';
+      const limit = data?.data?.limit != null ? `(Limit: $${data.data.limit})` : '';
+      return { success: true, message: `✅ কানেকশন সফল! ${label} সক্রিয় আছে ${limit}` };
+    }
+
+    const modelsRes = await fetch('https://openrouter.ai/api/v1/models', {
+      headers: {
+        Authorization: `Bearer ${apiKey.trim()}`,
+      },
+    });
+    if (modelsRes.ok) {
+      return { success: true, message: '✅ কানেকশন সফল! OpenRouter AI ইঞ্জিন প্রস্তুত।' };
+    }
+    return { success: false, message: `❌ API Key টি সঠিক নয় (HTTP ${res.status})` };
+  } catch (err: any) {
+    return { success: false, message: `❌ টেস্ট ব্যর্থ: ${err.message || 'Network Error'}` };
+  }
 }

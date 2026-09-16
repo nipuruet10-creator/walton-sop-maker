@@ -18,7 +18,7 @@ A manufacturing Standard Operating Procedure (SOP) generator and precision A4 la
 - **Framework**: React 19 + TypeScript + Vite 8
 - **Styling**: Tailwind CSS v4
 - **Icons**: Lucide React
-- **Export Engines**: SheetJS (`xlsx`), jsPDF, html2canvas
+- **Export Engines**: ExcelJS + FileSaver (with embedded Walton logo), jsPDF + html2canvas-pro (with universal Bengali font rendering)
 - **Deployment**: Vercel ready (`vercel.json`)
 
 ## 📦 Deployment to Vercel

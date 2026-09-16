@@ -1,270 +1,393 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import type { SOPDocument } from '../types/sop';
 import { toBengaliNumber } from '../data/defaultSopData';
+import { WALTON_LOGO_BASE64 } from '../assets/waltonLogoBase64';
 
-export function exportSOPToExcel(data: SOPDocument) {
-  const wb = XLSX.utils.book_new();
+export async function exportSOPToExcel(data: SOPDocument) {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Walton Hi-Tech Industries PLC';
+  wb.lastModifiedBy = 'Walton SOP Maker';
+  wb.created = new Date();
 
-  // Grid sizing:
-  // Cols A-D (0-3): Left Column (Photos, Parts)
-  // Col E (4): Space / Gap Divider
-  // Cols F-I (5-8): Right Column (Procedure, Quality Points, General Instructions, Safety, Tools)
+  // 1. Sheet 1: SOP Visual Layout (Identical to physical SOP document)
+  const ws = wb.addWorksheet('SOP Visual Layout', {
+    pageSetup: {
+      orientation: 'landscape',
+      paperSize: 9, // A4
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 1,
+    },
+    views: [{ showGridLines: true }],
+  });
 
-  const maxRows = 45;
-  const grid: any[][] = Array.from({ length: maxRows }, () => Array(9).fill(''));
-  const merges: XLSX.Range[] = [];
+  // Set precise column widths (Cols A to I)
+  ws.columns = [
+    { width: 18 }, // A: Photo Label / Parts SL
+    { width: 28 }, // B: Photo Title / Parts Name
+    { width: 18 }, // C: Photo 2 Label / Capacity
+    { width: 28 }, // D: Photo 2 Title / Gas
+    { width: 4 },  // E: Column Divider
+    { width: 8 },  // F: Step SL / Tool SL
+    { width: 55 }, // G: Step details / Tool Name
+    { width: 22 }, // H: Quality notes / Range
+    { width: 16 }, // I: Status / Signature
+  ];
 
-  const addMerge = (sR: number, sC: number, eR: number, eC: number) => {
-    merges.push({ s: { r: sR, c: sC }, e: { r: eR, c: eC } });
+  // Helper styles
+  const thinBorder: Partial<ExcelJS.Borders> = {
+    top: { style: 'thin', color: { argb: 'FF000000' } },
+    left: { style: 'thin', color: { argb: 'FF000000' } },
+    bottom: { style: 'thin', color: { argb: 'FF000000' } },
+    right: { style: 'thin', color: { argb: 'FF000000' } },
   };
 
-  // 1. HEADER SECTION (Rows 0-5)
-  // Row 0: Company Header & Station Info
-  grid[0][0] = 'WALTON HI-TECH INDUSTRIES PLC.';
-  addMerge(0, 0, 0, 3);
-  grid[0][5] = 'Station / Line:';
-  grid[0][6] = data.header.stationLine;
-  addMerge(0, 6, 0, 7);
-  grid[0][8] = `Rev: ${data.header.revisionNo}`;
+  const headerFill: ExcelJS.Fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFF1F5F9' },
+  };
 
-  // Row 1: Document Subtitle & Ref No
-  grid[1][0] = 'STANDARD OPERATING PROCEDURE (SOP) / কার্যপ্রণালী';
-  addMerge(1, 0, 1, 3);
-  grid[1][5] = 'Reference No:';
-  grid[1][6] = data.header.referenceNo;
-  addMerge(1, 6, 1, 7);
-  grid[1][8] = `Date: ${data.header.effectiveDate}`;
+  const sectionFill: ExcelJS.Fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF005697' }, // Walton Blue
+  };
 
-  // Row 2: Process Name & Prepared By
-  grid[2][0] = 'Process Name:';
-  grid[2][1] = data.header.processName;
-  addMerge(2, 1, 2, 3);
-  grid[2][5] = 'Prepared By:';
-  grid[2][6] = data.header.preparedBy.name ? `${data.header.preparedBy.name} (${data.header.preparedBy.designation || 'Engineer'})` : 'N/A';
-  addMerge(2, 6, 2, 8);
+  // Row 1: Logo & Company Name + Station Line
+  ws.mergeCells('A1:B1');
+  ws.mergeCells('C1:D1');
+  const c1 = ws.getCell('C1');
+  c1.value = 'WALTON HI-TECH INDUSTRIES PLC.';
+  c1.font = { name: 'Arial', size: 13, bold: true, color: { argb: 'FF005697' } };
+  c1.alignment = { vertical: 'middle', horizontal: 'left' };
 
-  // Row 3: Model & Checked / Approved
-  grid[3][0] = 'Model:';
-  grid[3][1] = data.header.model;
-  addMerge(3, 1, 3, 3);
-  grid[3][5] = 'Approved By:';
-  grid[3][6] = data.header.approvedBy.name || 'Pending Approval';
-  addMerge(3, 6, 3, 8);
+  // ADD WALTON LOGO TO CELL A1
+  try {
+    const logoId = wb.addImage({
+      base64: WALTON_LOGO_BASE64,
+      extension: 'png',
+    });
+    ws.addImage(logoId, {
+      tl: { col: 0.1, row: 0.1 },
+      ext: { width: 130, height: 42 },
+      editAs: 'oneCell',
+    });
+  } catch (err) {
+    console.warn('Failed to embed logo in Excel, proceeding with text:', err);
+  }
 
-  // Row 4: Format Ref & Reason of Changes
-  grid[4][0] = 'Format Ref. No:';
-  grid[4][1] = data.header.formatRefNo;
-  addMerge(4, 1, 4, 3);
-  grid[4][5] = 'Reason of Changes:';
-  grid[4][6] = data.header.reasonOfChanges || 'Initial Release / Standard Production';
-  addMerge(4, 6, 4, 8);
+  ws.getCell('F1').value = 'Station / Line:';
+  ws.getCell('F1').font = { bold: true, size: 10 };
+  ws.mergeCells('G1:H1');
+  ws.getCell('G1').value = data.header.stationLine;
+  ws.getCell('I1').value = `Rev: ${data.header.revisionNo}`;
 
-  // Row 5: Empty separator
-  grid[5][0] = '------------------------------------------------------------';
-  addMerge(5, 0, 5, 3);
-  grid[5][5] = '------------------------------------------------------------';
-  addMerge(5, 5, 5, 8);
+  // Row 2: Subtitle & Ref No
+  ws.mergeCells('A2:D2');
+  const c2 = ws.getCell('A2');
+  c2.value = 'STANDARD OPERATING PROCEDURE (SOP) / কার্যপ্রণালী';
+  c2.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF334155' } };
+  c2.alignment = { vertical: 'middle', horizontal: 'center' };
+  c2.fill = headerFill;
 
-  // 2. MAIN SECTION HEADERS (Row 6)
-  grid[6][0] = '📷 Photograph / Sketch / Demo View (If Required - Must be Clear)';
-  addMerge(6, 0, 6, 3);
-  grid[6][5] = '📋 কার্যপ্রণালী (WORK PROCEDURE)';
-  addMerge(6, 5, 6, 8);
+  ws.getCell('F2').value = 'Reference No:';
+  ws.getCell('F2').font = { bold: true, size: 10 };
+  ws.mergeCells('G2:H2');
+  ws.getCell('G2').value = data.header.referenceNo;
+  ws.getCell('I2').value = `Date: ${data.header.effectiveDate}`;
 
-  // 3. MIDDLE BODY (Row 7+)
-  // LEFT SIDE: Photo Layout Grid
+  // Row 3: Process Name & Prepared By
+  ws.getCell('A3').value = 'Process Name:';
+  ws.getCell('A3').font = { bold: true, size: 10 };
+  ws.mergeCells('B3:D3');
+  ws.getCell('B3').value = data.header.processName;
+  ws.getCell('B3').font = { bold: true, size: 10 };
+
+  ws.getCell('F3').value = 'Prepared By:';
+  ws.getCell('F3').font = { bold: true, size: 10 };
+  ws.mergeCells('G3:I3');
+  ws.getCell('G3').value = data.header.preparedBy.name
+    ? `${data.header.preparedBy.name} (${data.header.preparedBy.designation || 'Engineer'})`
+    : 'N/A';
+
+  // Row 4: Model & Approved By
+  ws.getCell('A4').value = 'Model:';
+  ws.getCell('A4').font = { bold: true, size: 10 };
+  ws.mergeCells('B4:D4');
+  ws.getCell('B4').value = data.header.model;
+
+  ws.getCell('F4').value = 'Approved By:';
+  ws.getCell('F4').font = { bold: true, size: 10 };
+  ws.mergeCells('G4:I4');
+  ws.getCell('G4').value = data.header.approvedBy.name || 'Pending Approval';
+
+  // Row 5: Format Ref & Reason of Changes
+  ws.getCell('A5').value = 'Format Ref:';
+  ws.getCell('A5').font = { bold: true, size: 10 };
+  ws.mergeCells('B5:D5');
+  ws.getCell('B5').value = data.header.formatRefNo;
+
+  ws.getCell('F5').value = 'Reason:';
+  ws.getCell('F5').font = { bold: true, size: 10 };
+  ws.mergeCells('G5:I5');
+  ws.getCell('G5').value = data.header.reasonOfChanges || 'Initial Release / Standard Production';
+
+  // Apply borders across header cells
+  for (let r = 1; r <= 5; r++) {
+    for (let c = 1; c <= 9; c++) {
+      if (c !== 5) {
+        ws.getRow(r).getCell(c).border = thinBorder;
+      }
+    }
+  }
+
+  // Row 6: Blank row
+  ws.getRow(6).height = 10;
+
+  // Row 7: Main Section Headers (Two-Column Layout)
+  ws.mergeCells('A7:D7');
+  const hLeft = ws.getCell('A7');
+  hLeft.value = '📷 Photograph / Sketch / Demo View (If Required - Must be Clear)';
+  hLeft.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+  hLeft.fill = sectionFill;
+  hLeft.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  ws.mergeCells('F7:I7');
+  const hRight = ws.getCell('F7');
+  hRight.value = '📋 কার্যপ্রণালী (WORK PROCEDURE)';
+  hRight.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+  hRight.fill = sectionFill;
+  hRight.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  // Middle Section (Row 8+)
+  // LEFT: Photo Grid
+  let leftRow = 8;
   const photos = data.photos;
-  let leftRow = 7;
   for (let i = 0; i < photos.length; i += 2) {
     const p1 = photos[i];
     const p2 = photos[i + 1];
 
-    grid[leftRow][0] = `[${p1.label || `চিত্র-${toBengaliNumber(i + 1)}`}] ${p1.name || `Photo ${i + 1}`}`;
-    addMerge(leftRow, 0, leftRow, 1);
+    ws.mergeCells(`A${leftRow}:B${leftRow}`);
+    const cellP1 = ws.getCell(`A${leftRow}`);
+    cellP1.value = `[${p1.label || `চিত্র-${toBengaliNumber(i + 1)}`}] ${p1.name || `Photo ${i + 1}`}`;
+    cellP1.font = { bold: true, size: 9 };
+    cellP1.alignment = { horizontal: 'center', vertical: 'middle' };
+    cellP1.fill = headerFill;
 
     if (p2) {
-      grid[leftRow][2] = `[${p2.label || `চিত্র-${toBengaliNumber(i + 2)}`}] ${p2.name || `Photo ${i + 2}`}`;
-      addMerge(leftRow, 2, leftRow, 3);
+      ws.mergeCells(`C${leftRow}:D${leftRow}`);
+      const cellP2 = ws.getCell(`C${leftRow}`);
+      cellP2.value = `[${p2.label || `চিত্র-${toBengaliNumber(i + 2)}`}] ${p2.name || `Photo ${i + 2}`}`;
+      cellP2.font = { bold: true, size: 9 };
+      cellP2.alignment = { horizontal: 'center', vertical: 'middle' };
+      cellP2.fill = headerFill;
     }
     leftRow++;
 
-    grid[leftRow][0] = '(ছবি সংযুক্ত থাকবে)';
-    addMerge(leftRow, 0, leftRow, 1);
+    // Photo Box Placeholder / Info
+    ws.mergeCells(`A${leftRow}:B${leftRow}`);
+    const phBox1 = ws.getCell(`A${leftRow}`);
+    phBox1.value = '(ছবি সংযুক্ত থাকবে / Image Attachment)';
+    phBox1.font = { italic: true, size: 8, color: { argb: 'FF64748B' } };
+    phBox1.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getRow(leftRow).height = 42;
+
     if (p2) {
-      grid[leftRow][2] = '(ছবি সংযুক্ত থাকবে)';
-      addMerge(leftRow, 2, leftRow, 3);
+      ws.mergeCells(`C${leftRow}:D${leftRow}`);
+      const phBox2 = ws.getCell(`C${leftRow}`);
+      phBox2.value = '(ছবি সংযুক্ত থাকবে / Image Attachment)';
+      phBox2.font = { italic: true, size: 8, color: { argb: 'FF64748B' } };
+      phBox2.alignment = { horizontal: 'center', vertical: 'middle' };
     }
-    leftRow += 2;
+    leftRow++;
   }
 
-  // RIGHT SIDE: Procedure Steps, Quality Points, General Instructions
-  let rightRow = 7;
+  // RIGHT: Procedure Steps
+  let rightRow = 8;
   data.procedure.steps.forEach((step, idx) => {
-    grid[rightRow][5] = `${toBengaliNumber(idx + 1)})`;
-    grid[rightRow][6] = step.replace(/^([০-৯\d]+[\)\.\-:]\s*)/, '');
-    addMerge(rightRow, 6, rightRow, 8);
+    ws.getCell(`F${rightRow}`).value = `${toBengaliNumber(idx + 1)})`;
+    ws.getCell(`F${rightRow}`).font = { bold: true, size: 10 };
+    ws.getCell(`F${rightRow}`).alignment = { horizontal: 'right', vertical: 'top' };
+
+    ws.mergeCells(`G${rightRow}:I${rightRow}`);
+    const stepCell = ws.getCell(`G${rightRow}`);
+    stepCell.value = step.replace(/^([০-৯\d]+[\)\.\-:]\s*)/, '');
+    stepCell.font = { size: 10 };
+    stepCell.alignment = { wrapText: true, vertical: 'top' };
     rightRow++;
   });
 
   // Critical Quality Points
   rightRow++;
-  grid[rightRow][5] = '⭐ লক্ষণীয় বিষয় (CRITICAL QUALITY POINTS)';
-  addMerge(rightRow, 5, rightRow, 8);
+  ws.mergeCells(`F${rightRow}:I${rightRow}`);
+  const qHeader = ws.getCell(`F${rightRow}`);
+  qHeader.value = '⭐ লক্ষণীয় বিষয় (CRITICAL QUALITY POINTS)';
+  qHeader.font = { bold: true, size: 10, color: { argb: 'FF92400E' } };
+  qHeader.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
   rightRow++;
 
-  data.procedure.qualityPoints.forEach((point, idx) => {
-    grid[rightRow][5] = `${toBengaliNumber(idx + 1)})`;
-    grid[rightRow][6] = point.replace(/^([০-৯\d]+[\)\.\-:]\s*)/, '');
-    addMerge(rightRow, 6, rightRow, 8);
+  data.procedure.qualityPoints.forEach((pt, idx) => {
+    ws.getCell(`F${rightRow}`).value = `${toBengaliNumber(idx + 1)})`;
+    ws.getCell(`F${rightRow}`).font = { bold: true, size: 10 };
+    ws.getCell(`F${rightRow}`).alignment = { horizontal: 'right', vertical: 'top' };
+
+    ws.mergeCells(`G${rightRow}:I${rightRow}`);
+    const ptCell = ws.getCell(`G${rightRow}`);
+    ptCell.value = pt.replace(/^([০-৯\d]+[\)\.\-:]\s*)/, '');
+    ptCell.font = { size: 10 };
+    ptCell.alignment = { wrapText: true, vertical: 'top' };
     rightRow++;
   });
 
   // General Instructions
   rightRow++;
-  grid[rightRow][5] = '📌 সাধারণ নির্দেশনা (GENERAL INSTRUCTIONS)';
-  addMerge(rightRow, 5, rightRow, 8);
+  ws.mergeCells(`F${rightRow}:I${rightRow}`);
+  const gHeader = ws.getCell(`F${rightRow}`);
+  gHeader.value = '📌 সাধারণ নির্দেশনা (GENERAL INSTRUCTIONS)';
+  gHeader.font = { bold: true, size: 10, color: { argb: 'FF1E293B' } };
+  gHeader.fill = headerFill;
   rightRow++;
 
   data.procedure.generalInstructions.forEach((inst, idx) => {
-    grid[rightRow][5] = `${toBengaliNumber(idx + 1)})`;
-    grid[rightRow][6] = inst.replace(/^([০-৯\d]+[\)\.\-:]\s*)/, '');
-    addMerge(rightRow, 6, rightRow, 8);
+    ws.getCell(`F${rightRow}`).value = `${toBengaliNumber(idx + 1)})`;
+    ws.getCell(`F${rightRow}`).font = { bold: true, size: 10 };
+    ws.getCell(`F${rightRow}`).alignment = { horizontal: 'right', vertical: 'top' };
+
+    ws.mergeCells(`G${rightRow}:I${rightRow}`);
+    const instCell = ws.getCell(`G${rightRow}`);
+    instCell.value = inst.replace(/^([০-৯\d]+[\)\.\-:]\s*)/, '');
+    instCell.font = { size: 10 };
+    instCell.alignment = { wrapText: true, vertical: 'top' };
     rightRow++;
   });
 
-  // 4. BOTTOM SECTION: Parts (Left) & Safety / Tools (Right)
+  // Bottom Tables Section
   const bottomStart = Math.max(leftRow + 1, rightRow + 1);
 
   // Left Bottom: Parts Table
-  grid[bottomStart][0] = '📦 PARTS & MATERIALS';
-  addMerge(bottomStart, 0, bottomStart, 3);
+  ws.mergeCells(`A${bottomStart}:D${bottomStart}`);
+  const partsH = ws.getCell(`A${bottomStart}`);
+  partsH.value = '📦 PARTS & MATERIALS';
+  partsH.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+  partsH.fill = sectionFill;
 
-  // Right Bottom: Safety Instructions
-  grid[bottomStart][5] = '🛡️ SAFETY INSTRUCTION & PPE';
-  addMerge(bottomStart, 5, bottomStart, 8);
+  ws.getCell(`A${bottomStart + 1}`).value = 'SL';
+  ws.getCell(`B${bottomStart + 1}`).value = 'Parts Name';
+  ws.getCell(`C${bottomStart + 1}`).value = 'Capacity(BTU)';
+  ws.getCell(`D${bottomStart + 1}`).value = 'Gas';
+  ['A', 'B', 'C', 'D'].forEach((col) => {
+    ws.getCell(`${col}${bottomStart + 1}`).font = { bold: true, size: 9 };
+    ws.getCell(`${col}${bottomStart + 1}`).fill = headerFill;
+  });
 
-  // Row bottomStart + 1
-  grid[bottomStart + 1][0] = 'SL';
-  grid[bottomStart + 1][1] = 'Parts Name';
-  grid[bottomStart + 1][2] = 'Capacity(BTU)';
-  grid[bottomStart + 1][3] = 'Gas';
+  data.parts.forEach((p, idx) => {
+    const r = bottomStart + 2 + idx;
+    ws.getCell(`A${r}`).value = p.sl;
+    ws.getCell(`B${r}`).value = p.name;
+    ws.getCell(`C${r}`).value = p.capacity;
+    ws.getCell(`D${r}`).value = p.gas;
+  });
 
-  const ppeList = [
+  // Right Bottom: Safety & Tools
+  ws.mergeCells(`F${bottomStart}:I${bottomStart}`);
+  const safetyH = ws.getCell(`F${bottomStart}`);
+  safetyH.value = '🛡️ SAFETY INSTRUCTION & PPE';
+  safetyH.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+  safetyH.fill = sectionFill;
+
+  const ppeText = [
     `Ear Muff: ${data.safety.earMuff ? 'YES' : 'NO'}`,
     `Hand Gloves: ${data.safety.gloves ? 'YES' : 'NO'}`,
     `Goggles: ${data.safety.goggles ? 'YES' : 'NO'}`,
-    `Safety Shoes: ${data.safety.safetyShoes ? 'YES' : 'NO'}`,
+    `Shoes: ${data.safety.safetyShoes ? 'YES' : 'NO'}`,
     `Mask: ${data.safety.mask ? 'YES' : 'NO'}`,
-  ].join('  |  ');
-  grid[bottomStart + 1][5] = ppeList;
-  addMerge(bottomStart + 1, 5, bottomStart + 1, 8);
+  ].join('   |   ');
 
-  // Safety directive text
-  grid[bottomStart + 2][5] = `Directive: ${data.safety.instructionText}`;
-  addMerge(bottomStart + 2, 5, bottomStart + 2, 8);
+  ws.mergeCells(`F${bottomStart + 1}:I${bottomStart + 1}`);
+  ws.getCell(`F${bottomStart + 1}`).value = ppeText;
+  ws.getCell(`F${bottomStart + 1}`).font = { size: 9, bold: true };
 
-  // Tools Table Header on Right
-  grid[bottomStart + 3][5] = '🔧 TOOLS & EQUIPMENTS';
-  addMerge(bottomStart + 3, 5, bottomStart + 3, 8);
+  ws.mergeCells(`F${bottomStart + 2}:I${bottomStart + 2}`);
+  ws.getCell(`F${bottomStart + 2}`).value = `Directive: ${data.safety.instructionText}`;
+  ws.getCell(`F${bottomStart + 2}`).font = { size: 9, italic: true };
 
-  grid[bottomStart + 4][5] = 'SL';
-  grid[bottomStart + 4][6] = 'Tool / Equipment Name';
-  addMerge(bottomStart + 4, 6, bottomStart + 4, 7);
-  grid[bottomStart + 4][8] = 'Effective Range';
+  // Tools Table
+  ws.mergeCells(`F${bottomStart + 3}:I${bottomStart + 3}`);
+  const toolH = ws.getCell(`F${bottomStart + 3}`);
+  toolH.value = '🔧 TOOLS & EQUIPMENTS';
+  toolH.font = { bold: true, size: 10, color: { argb: 'FF1E293B' } };
+  toolH.fill = headerFill;
 
-  // Fill Parts rows on left
-  data.parts.forEach((p, i) => {
-    const r = bottomStart + 2 + i;
-    if (r < maxRows) {
-      grid[r][0] = p.sl;
-      grid[r][1] = p.name;
-      grid[r][2] = p.capacity;
-      grid[r][3] = p.gas;
-    }
+  ws.getCell(`F${bottomStart + 4}`).value = 'SL';
+  ws.mergeCells(`G${bottomStart + 4}:H${bottomStart + 4}`);
+  ws.getCell(`G${bottomStart + 4}`).value = 'Tool / Equipment Name';
+  ws.getCell(`I${bottomStart + 4}`).value = 'Effective Range';
+  ['F', 'G', 'I'].forEach((col) => {
+    ws.getCell(`${col}${bottomStart + 4}`).font = { bold: true, size: 9 };
   });
 
-  // Fill Tools rows on right
-  data.tools.forEach((t, i) => {
-    const r = bottomStart + 5 + i;
-    if (r < maxRows) {
-      grid[r][5] = t.sl;
-      grid[r][6] = t.name;
-      addMerge(r, 6, r, 7);
-      grid[r][8] = t.effectiveRange;
-    }
+  data.tools.forEach((t, idx) => {
+    const r = bottomStart + 5 + idx;
+    ws.getCell(`F${r}`).value = t.sl;
+    ws.mergeCells(`G${r}:H${r}`);
+    ws.getCell(`G${r}`).value = t.name;
+    ws.getCell(`I${r}`).value = t.effectiveRange;
   });
 
-  // Trim trailing empty rows
-  let lastFilled = maxRows - 1;
-  while (lastFilled > bottomStart + 6 && grid[lastFilled].every((cell: any) => !cell)) {
-    lastFilled--;
-  }
-  const cleanGrid = grid.slice(0, lastFilled + 2);
-
-  const wsLayout = XLSX.utils.aoa_to_sheet(cleanGrid);
-  wsLayout['!merges'] = merges;
-
-  // Set precise column widths to create the balanced SOP view
-  wsLayout['!cols'] = [
-    { wch: 18 }, // Col A: Photo 1 Label / Parts SL
-    { wch: 28 }, // Col B: Photo 1 Title / Parts Name
-    { wch: 18 }, // Col C: Photo 2 Label / Capacity
-    { wch: 28 }, // Col D: Photo 2 Title / Gas
-    { wch: 3 },  // Col E: Space Divider
-    { wch: 6 },  // Col F: Procedure Numbering / Tool SL
-    { wch: 50 }, // Col G: Procedure Content / Tool Name
-    { wch: 22 }, // Col H: Procedure Extra / Range
-    { wch: 16 }, // Col I: Status
+  // Sheet 2: Tabular Data for Formulas & Searching
+  const wsTabular = wb.addWorksheet('Procedure Steps (ডাটা)');
+  wsTabular.columns = [
+    { header: 'ক্রমিক নং', key: 'sl', width: 10 },
+    { header: 'কাজের বিবরণ (Bangla)', key: 'desc', width: 75 },
+    { header: 'সম্পৃক্ত ছবি (Photo Link)', key: 'photo', width: 25 },
   ];
+  data.procedure.steps.forEach((step, idx) => {
+    const photoRef = (step.match(/\(চিত্র-[০-৯]+\)/) || [])[0] || '-';
+    wsTabular.addRow({
+      sl: toBengaliNumber(idx + 1),
+      desc: step,
+      photo: photoRef,
+    });
+  });
 
-  XLSX.utils.book_append_sheet(wb, wsLayout, 'SOP Visual Layout');
-
-  // Sheet 2: Procedure & Quality Points (Tabular view for data sorting)
-  const tabularData = [
-    ['WALTON HI-TECH INDUSTRIES PLC. - SOP DATA TABLE'],
-    ['Process Name', data.header.processName, 'Station / Line', data.header.stationLine],
-    [],
-    ['=== কার্যপ্রণালী (PROCEDURE STEPS) ==='],
-    ['ক্রমিক নং', 'কাজের বিবরণ (Bangla)', 'সম্পৃক্ত ছবি (Photo Link)'],
-    ...data.procedure.steps.map((step, idx) => {
-      const photoRef = (step.match(/\(চিত্র-[০-৯]+\)/) || [])[0] || '-';
-      return [toBengaliNumber(idx + 1), step, photoRef];
-    }),
-    [],
-    ['=== লক্ষণীয় বিষয় (CRITICAL QUALITY POINTS) ==='],
-    ['ক্রমিক নং', 'লক্ষণীয় বিষয়', 'সম্পৃক্ত ছবি'],
-    ...data.procedure.qualityPoints.map((p, idx) => {
-      const photoRef = (p.match(/\(চিত্র-[০-৯]+\)/) || [])[0] || '-';
-      return [toBengaliNumber(idx + 1), p, photoRef];
-    }),
-    [],
-    ['=== সাধারণ নির্দেশনা (GENERAL INSTRUCTIONS) ==='],
-    ['ক্রমিক নং', 'নির্দেশনা'],
-    ...data.procedure.generalInstructions.map((inst, idx) => [toBengaliNumber(idx + 1), inst]),
+  // Sheet 3: Parts
+  const wsParts = wb.addWorksheet('Parts List (যন্ত্রাংশ)');
+  wsParts.columns = [
+    { header: 'SL. No', key: 'sl', width: 10 },
+    { header: 'Parts Name', key: 'name', width: 35 },
+    { header: 'Capacity(BTU)', key: 'capacity', width: 20 },
+    { header: 'Gas', key: 'gas', width: 18 },
   ];
-  const wsTabular = XLSX.utils.aoa_to_sheet(tabularData);
-  wsTabular['!cols'] = [{ wch: 10 }, { wch: 75 }, { wch: 25 }, { wch: 20 }];
-  XLSX.utils.book_append_sheet(wb, wsTabular, 'Procedure Steps (বিস্তারিত)');
+  data.parts.forEach((p) => wsParts.addRow(p));
 
-  // Sheet 3: Parts List
-  const partsData = [
-    ['SL. No', 'Parts Name', 'Capacity(BTU)', 'Gas'],
-    ...data.parts.map(p => [p.sl, p.name, p.capacity, p.gas]),
+  // Sheet 4: Tools
+  const wsTools = wb.addWorksheet('Tools List (টুলস)');
+  wsTools.columns = [
+    { header: 'SL', key: 'sl', width: 10 },
+    { header: 'Tool / Equipment Name', key: 'name', width: 40 },
+    { header: 'Effective Range', key: 'range', width: 25 },
   ];
-  const wsParts = XLSX.utils.aoa_to_sheet(partsData);
-  wsParts['!cols'] = [{ wch: 8 }, { wch: 35 }, { wch: 20 }, { wch: 18 }];
-  XLSX.utils.book_append_sheet(wb, wsParts, 'Parts List (যন্ত্রাংশ)');
+  data.tools.forEach((t) => wsTools.addRow({ sl: t.sl, name: t.name, range: t.effectiveRange }));
 
-  // Sheet 4: Tools List
-  const toolsData = [
-    ['SL', 'Tool / Equipment Name', 'Effective Range'],
-    ...data.tools.map(t => [t.sl, t.name, t.effectiveRange]),
-  ];
-  const wsTools = XLSX.utils.aoa_to_sheet(toolsData);
-  wsTools['!cols'] = [{ wch: 8 }, { wch: 40 }, { wch: 25 }];
-  XLSX.utils.book_append_sheet(wb, wsTools, 'Tools List (টুলস)');
+  // Apply Nirmala UI as primary font across all worksheets & cells
+  wb.eachSheet((sheet) => {
+    sheet.eachRow((row) => {
+      row.eachCell((cell) => {
+        cell.font = {
+          name: 'Nirmala UI',
+          ...(cell.font || {}),
+        };
+      });
+    });
+  });
 
-  // Generate and download .xlsx file
-  const fileName = `${data.header.processName.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'walton_sop'}.xlsx`;
-  XLSX.writeFile(wb, fileName);
+  // Generate binary buffer & trigger download via FileSaver
+  const buffer = await wb.xlsx.writeBuffer();
+  const safeName = data.header.processName.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'walton_sop';
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  saveAs(blob, `${safeName}.xlsx`);
 }

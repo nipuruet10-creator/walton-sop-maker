@@ -164,12 +164,12 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
                     ? activeProvider === 'openrouter'
                       ? `AI: ${activeModel.replace(':free', '').split('/').pop()}`
                       : 'Gemini AI'
-                    : 'Offline Engine (Setup AI)'}
+                    : 'বাংলা ইঞ্জিন (Setup AI)'}
                 </span>
               </button>
             ) : (
               <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
-                {hasApiKey ? 'AI Ready' : 'Offline Engine'}
+                {hasApiKey ? 'AI Ready' : 'বাংলা ইঞ্জিন'}
               </span>
             )}
 
