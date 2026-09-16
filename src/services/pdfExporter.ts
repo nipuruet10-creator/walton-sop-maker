@@ -14,39 +14,69 @@ export async function downloadSOPAsPdf(elementId: string = 'sop-paper', processN
     await document.fonts.ready;
   }
 
+  // A4 Landscape 287mm x 198mm pixel dimensions at 96 DPI
+  const A4_WIDTH_PX = 1085;
+  const A4_HEIGHT_PX = 748;
+
   // High DPI capture with html2canvas-pro (full support for oklch, lab, modern CSS colors)
   const canvas = await html2canvas(element, {
-    scale: 2.5, // High DPI capture for crisp text and sharp photos
+    scale: 2.5, // 2.5x high DPI for razor-sharp Bengali text and photos
     useCORS: true,
     logging: false,
     backgroundColor: '#ffffff',
-    windowWidth: element.scrollWidth,
+    width: A4_WIDTH_PX,
+    height: A4_HEIGHT_PX,
+    windowWidth: 1400,
+    windowHeight: 900,
     onclone: (clonedDoc) => {
+      // 1. Neutralize zoom transform on the wrapper
+      const clonedWrapper = clonedDoc.getElementById('sop-paper-wrapper');
+      if (clonedWrapper) {
+        clonedWrapper.style.transform = 'none';
+        clonedWrapper.style.width = `${A4_WIDTH_PX}px`;
+        clonedWrapper.style.height = `${A4_HEIGHT_PX}px`;
+        clonedWrapper.style.padding = '0';
+        clonedWrapper.style.margin = '0';
+      }
+
       const clonedPaper = clonedDoc.getElementById(elementId);
       if (clonedPaper) {
-        // 1. Force Universal Bengali font stack with Nirmala UI and preserve word-spacing
-        clonedPaper.style.fontFamily =
-          "'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', 'Tiro Bangla', 'Vrinda', 'Segoe UI', Arial, sans-serif";
-        clonedPaper.style.letterSpacing = '0.015px';
+        // Enforce exact A4 pixel boundaries and standard letter-spacing (prevents collapsed words)
+        clonedPaper.style.transform = 'none';
+        clonedPaper.style.width = `${A4_WIDTH_PX}px`;
+        clonedPaper.style.height = `${A4_HEIGHT_PX}px`;
+        clonedPaper.style.minWidth = `${A4_WIDTH_PX}px`;
+        clonedPaper.style.maxWidth = `${A4_WIDTH_PX}px`;
+        clonedPaper.style.minHeight = `${A4_HEIGHT_PX}px`;
+        clonedPaper.style.maxHeight = `${A4_HEIGHT_PX}px`;
+        clonedPaper.style.margin = '0';
+        clonedPaper.style.padding = '0';
+        clonedPaper.style.boxSizing = 'border-box';
+        clonedPaper.style.letterSpacing = 'normal';
         clonedPaper.style.wordSpacing = 'normal';
 
-        // 2. Flatten all <input> elements into standard text <span> to avoid html2canvas text-squashing
+        // Universal Bengali font stack with Nirmala UI as requested by user
+        clonedPaper.style.fontFamily =
+          "'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', 'Vrinda', sans-serif";
+
+        // Flatten all <input> elements into standard <span> to avoid html2canvas input squashing
         const inputs = clonedPaper.querySelectorAll('input');
         inputs.forEach((input) => {
           const span = clonedDoc.createElement('span');
           span.textContent = input.value || input.placeholder || '';
           span.className = input.className;
           span.style.cssText = input.style.cssText;
-          span.style.display = 'inline-block';
+          span.style.display = 'block';
           span.style.fontFamily =
-            "'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', 'Inter', sans-serif";
-          span.style.letterSpacing = '0.02px';
+            "'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', sans-serif";
+          span.style.letterSpacing = 'normal';
           span.style.wordSpacing = 'normal';
           span.style.whiteSpace = 'normal';
+          span.style.margin = '0';
           input.parentNode?.replaceChild(span, input);
         });
 
-        // 3. Flatten any <textarea> elements
+        // Flatten any <textarea> elements
         const textareas = clonedPaper.querySelectorAll('textarea');
         textareas.forEach((ta) => {
           const div = clonedDoc.createElement('div');
@@ -55,19 +85,19 @@ export async function downloadSOPAsPdf(elementId: string = 'sop-paper', processN
           div.style.cssText = ta.style.cssText;
           div.style.fontFamily =
             "'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', sans-serif";
-          div.style.letterSpacing = '0.015px';
+          div.style.letterSpacing = 'normal';
           div.style.wordSpacing = 'normal';
           ta.parentNode?.replaceChild(div, ta);
         });
 
-        // 4. Ensure the Walton logo in header is loaded with high-resolution base64
+        // Ensure the Walton logo in header is loaded with high-resolution base64
         const logoImgs = clonedPaper.querySelectorAll('img[alt*="Logo"], img[alt*="logo"], img[alt*="Walton"]');
         logoImgs.forEach((img: any) => {
           img.src = WALTON_LOGO_BASE64;
         });
       }
 
-      // 5. Ensure all SVGs are rendered with geometric precision
+      // Ensure all SVGs are rendered with geometric precision
       const svgs = clonedDoc.querySelectorAll('svg');
       svgs.forEach((svg) => {
         svg.setAttribute('shape-rendering', 'geometricPrecision');

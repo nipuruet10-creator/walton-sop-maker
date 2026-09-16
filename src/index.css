@@ -86,7 +86,7 @@ body {
   box-sizing: border-box;
   overflow: hidden;
   font-family: 'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', 'Vrinda', 'Tiro Bangla', Arial, sans-serif !important;
-  letter-spacing: 0.015px;
+  letter-spacing: normal;
   word-spacing: normal;
 }
 
