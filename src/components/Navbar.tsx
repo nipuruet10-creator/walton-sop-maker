@@ -1,5 +1,5 @@
-import React from 'react';
-import type { UserProfile } from '../types/auth';
+import React, { useState, useRef, useEffect } from 'react';
+import type { UserProfile, NotificationItem } from '../types/auth';
 import {
   Printer,
   Download,
@@ -17,16 +17,20 @@ import {
   ShieldCheck,
   BarChart3,
   ShieldAlert,
+  Bell,
+  ArrowRight,
 } from 'lucide-react';
 
 interface NavbarProps {
   currentUser: UserProfile | null;
+  notifications?: NotificationItem[];
   onOpenLogin: () => void;
   onLogout: () => void;
   onOpenWorkspace: () => void;
   onOpenConcernSection: () => void;
   onOpenAnalytics: () => void;
   onOpenAdminPanel: () => void;
+  onSelectSopById?: (sopId: string) => void;
   onPrint: () => void;
   onDownloadPdf: () => void;
   onExportExcel: () => void;
@@ -46,12 +50,14 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
+  notifications = [],
   onOpenLogin,
   onLogout,
   onOpenWorkspace,
   onOpenConcernSection,
   onOpenAnalytics,
   onOpenAdminPanel,
+  onSelectSopById,
   onPrint,
   onDownloadPdf,
   onExportExcel,
@@ -68,6 +74,22 @@ export const Navbar: React.FC<NavbarProps> = ({
   isGenerating,
   isDownloadingPdf = false,
 }) => {
+  const [isNotifOpen, setIsNotifOpen] = useState<boolean>(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Close notifications dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setIsNotifOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
   return (
     <header className="no-print bg-slate-900 text-white border-b border-slate-800 px-4 py-2 flex flex-wrap items-center justify-between gap-3 shadow-md sticky top-0 z-40">
       {/* Left: Brand & Portal Navigation */}
@@ -117,7 +139,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               title="ইউজার ম্যানেজমেন্ট ও পাসওয়ার্ড রিকভারি"
             >
               <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-              <span>অ্যাডমিন</span>
+              <span>অ্যাডমিন সেটিংস</span>
             </button>
           )}
         </div>
@@ -137,8 +159,83 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
       </div>
 
-      {/* Right: User Profile, Export & Utility Tools */}
+      {/* Right: Notification Bell, User Profile, Export & Utility Tools */}
       <div className="flex items-center gap-2 flex-wrap">
+        {/* Notification Bell 🔔 */}
+        {currentUser && (
+          <div className="relative" ref={notifRef}>
+            <button
+              type="button"
+              onClick={() => setIsNotifOpen(!isNotifOpen)}
+              className="relative p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
+              title="নতুন নোটিফিকেশন"
+            >
+              <Bell className="w-4 h-4" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md animate-pulse">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Dropdown Popover */}
+            {isNotifOpen && (
+              <div className="absolute right-0 mt-2 w-80 bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                  <div className="flex items-center gap-1.5 font-bold text-xs">
+                    <Bell className="w-3.5 h-3.5 text-blue-400" />
+                    <span>নোটিফিকেশন সেন্টার</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-600 font-mono">
+                    {notifications.length} টি
+                  </span>
+                </div>
+
+                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                  {notifications.length === 0 ? (
+                    <div className="text-center py-8 text-xs text-slate-400">
+                      কোনো নতুন পেন্ডিং নোটিফিকেশন নেই
+                    </div>
+                  ) : (
+                    notifications.map((notif) => (
+                      <div
+                        key={notif.id}
+                        className={`p-3 text-xs hover:bg-slate-50 transition cursor-pointer ${
+                          !notif.isRead ? 'bg-blue-50/50' : ''
+                        }`}
+                        onClick={() => {
+                          if (notif.sopId && onSelectSopById) {
+                            onSelectSopById(notif.sopId);
+                            setIsNotifOpen(false);
+                          }
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-bold text-slate-800 line-clamp-1">
+                            {notif.sopTitle}
+                          </span>
+                          <span className="text-[9px] text-slate-400 shrink-0">
+                            {new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 mt-1 leading-tight">
+                          {notif.message}
+                        </p>
+                        <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100/60 text-[10px] text-blue-600 font-bold">
+                          <span>{notif.senderName} ({notif.senderRole})</span>
+                          <span className="flex items-center gap-0.5 text-blue-700 hover:underline">
+                            পর্যালোচনা করুন <ArrowRight className="w-3 h-3" />
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* User Account / Login Info */}
         {currentUser ? (
           <div className="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700 px-2.5 py-1 rounded-xl text-xs">
@@ -152,7 +249,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenWorkspace}
-              className="ml-1 p-1 hover:bg-slate-700 text-blue-300 rounded transition cursor-pointer"
+              className="ml-1 p-1 hover:bg-slate-700 text-blue-300 rounded transition cursor-pointer relative"
               title="আমার ওয়ার্কস্পেস"
             >
               <FolderArchive className="w-3.5 h-3.5" />

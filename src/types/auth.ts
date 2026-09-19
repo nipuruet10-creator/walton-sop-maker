@@ -35,3 +35,17 @@ export interface AuditLogEntry {
   timestamp: string;
   note?: string;
 }
+
+export interface NotificationItem {
+  id: string;
+  sopId: string;
+  sopTitle: string;
+  senderName: string;
+  senderRole: string;
+  targetUserId?: string;
+  targetRole: UserRole;
+  type: 'review_request' | 'approval_request' | 'approved' | 'revision_request';
+  message: string;
+  timestamp: string;
+  isRead: boolean;
+}

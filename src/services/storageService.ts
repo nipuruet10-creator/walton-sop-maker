@@ -1,4 +1,4 @@
-import type { UserProfile, SOPStatus, AuditLogEntry } from '../types/auth';
+import type { UserProfile, SOPStatus, AuditLogEntry, NotificationItem } from '../types/auth';
 import type { SOPDocument } from '../types/sop';
 
 const DB_NAME = 'WaltonSopDB';
@@ -255,6 +255,144 @@ export async function updateUserSignature(userId: string, signatureImg: string):
   } catch {
     return false;
   }
+}
+
+export async function addUser(user: UserProfile): Promise<boolean> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_USERS, 'readwrite');
+      const store = tx.objectStore(STORE_USERS);
+      store.put(user);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  } catch {
+    return false;
+  }
+}
+
+export async function updateUserProfile(user: UserProfile): Promise<boolean> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_USERS, 'readwrite');
+      const store = tx.objectStore(STORE_USERS);
+      store.put(user);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteUser(userId: string): Promise<boolean> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve) => {
+      const tx = db.transaction(STORE_USERS, 'readwrite');
+      const store = tx.objectStore(STORE_USERS);
+      store.delete(userId);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  } catch {
+    return false;
+  }
+}
+
+// Compute live notifications for a user based on pending review/approval tasks
+export async function getUserNotifications(currentUser: UserProfile | null): Promise<NotificationItem[]> {
+  if (!currentUser) return [];
+
+  const sops = await getAllSOPs();
+  const notifications: NotificationItem[] = [];
+
+  sops.forEach((doc) => {
+    // If user is Checked By or Admin, and status is 'forwarded_to_checker'
+    if (
+      (currentUser.role === 'checked_by' || currentUser.role === 'admin') &&
+      doc.status === 'forwarded_to_checker' &&
+      (!doc.checkedById || doc.checkedById === currentUser.id || currentUser.role === 'admin')
+    ) {
+      notifications.push({
+        id: `notif_${doc.id}_check`,
+        sopId: doc.id || '',
+        sopTitle: doc.header.processName || 'Untitled Process',
+        senderName: doc.authorName || 'Biplob Hossain',
+        senderRole: 'Prepared By',
+        targetUserId: doc.checkedById,
+        targetRole: 'checked_by',
+        type: 'review_request',
+        message: `${doc.authorName || 'ইঞ্জিনিয়ার'} "${doc.header.processName}" উচ্চপদস্থ পর্যালোচনার জন্য পাঠিয়েছেন।`,
+        timestamp: doc.updatedAt || doc.createdAt || new Date().toISOString(),
+        isRead: false,
+      });
+    }
+
+    // If user is Approved By (Kamrul) or Admin, and status is 'forwarded_to_approver'
+    if (
+      (currentUser.role === 'approved_by' || currentUser.role === 'admin') &&
+      doc.status === 'forwarded_to_approver'
+    ) {
+      notifications.push({
+        id: `notif_${doc.id}_appr`,
+        sopId: doc.id || '',
+        sopTitle: doc.header.processName || 'Untitled Process',
+        senderName: doc.checkedByName || 'Checked By In-Charge',
+        senderRole: 'Checked By',
+        targetUserId: doc.approvedById || 'Kamrul',
+        targetRole: 'approved_by',
+        type: 'approval_request',
+        message: `${doc.checkedByName || 'পর্যালোচক'} "${doc.header.processName}" চূড়ান্ত অনুমোদনের জন্য পাঠিয়েছেন।`,
+        timestamp: doc.updatedAt || doc.createdAt || new Date().toISOString(),
+        isRead: false,
+      });
+    }
+
+    // If user is author (Prepared By) and document was rejected/revision requested
+    if (
+      doc.status === 'rejected' &&
+      (doc.authorId === currentUser.id || currentUser.role === 'admin')
+    ) {
+      notifications.push({
+        id: `notif_${doc.id}_rev`,
+        sopId: doc.id || '',
+        sopTitle: doc.header.processName || 'Untitled Process',
+        senderName: doc.checkedByName || 'Reviewer',
+        senderRole: 'Checked By',
+        targetUserId: doc.authorId,
+        targetRole: 'prepared_by',
+        type: 'revision_request',
+        message: `"${doc.header.processName}" সংশোধনের জন্য ফেরত পাঠানো হয়েছে: ${doc.rejectionReason || 'সংশোধন প্রয়োজন'}`,
+        timestamp: doc.updatedAt || doc.createdAt || new Date().toISOString(),
+        isRead: false,
+      });
+    }
+
+    // If user is author and document is approved
+    if (
+      doc.status === 'approved' &&
+      (doc.authorId === currentUser.id || currentUser.role === 'admin')
+    ) {
+      notifications.push({
+        id: `notif_${doc.id}_done`,
+        sopId: doc.id || '',
+        sopTitle: doc.header.processName || 'Untitled Process',
+        senderName: doc.approvedByName || 'Kamrul Hasan',
+        senderRole: 'Approved By',
+        targetUserId: doc.authorId,
+        targetRole: 'prepared_by',
+        type: 'approved',
+        message: `অভিনন্দন! "${doc.header.processName}" চূড়ান্তভাবে অনুমোদিত হয়েছে।`,
+        timestamp: doc.approvedAt || doc.updatedAt || new Date().toISOString(),
+        isRead: true,
+      });
+    }
+  });
+
+  return notifications;
 }
 
 // Active session storage

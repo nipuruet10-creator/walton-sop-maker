@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { SOPDocument } from './types/sop';
-import type { UserProfile } from './types/auth';
+import type { UserProfile, NotificationItem } from './types/auth';
 import { defaultSopData } from './data/defaultSopData';
 import { Navbar } from './components/Navbar';
 import { WorkflowActionBar } from './components/Workflow/WorkflowActionBar';
@@ -31,6 +31,8 @@ import {
   getActiveUserSession,
   setActiveUserSession,
   INITIAL_USERS,
+  getUserNotifications,
+  getSOPById,
 } from './services/storageService';
 import { exportSOPToExcel } from './services/excelExporter';
 import { downloadSOPAsPdf } from './services/pdfExporter';
@@ -101,6 +103,45 @@ export const App: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isGeneratingQuality, setIsGeneratingQuality] = useState<boolean>(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
+
+  // Live Notifications
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
+  const refreshNotifications = async () => {
+    if (currentUser) {
+      try {
+        const notifs = await getUserNotifications(currentUser);
+        setNotifications(notifs);
+      } catch (e) {
+        console.warn('Error loading notifications:', e);
+      }
+    } else {
+      setNotifications([]);
+    }
+  };
+
+  useEffect(() => {
+    refreshNotifications();
+    const interval = setInterval(refreshNotifications, 4000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  useEffect(() => {
+    refreshNotifications();
+  }, [data.status, data.updatedAt]);
+
+  const handleSelectSopById = async (sopId: string) => {
+    try {
+      const targetDoc = await getSOPById(sopId);
+      if (targetDoc) {
+        setData(targetDoc);
+      } else {
+        alert('SOP টি পাওয়া যায়নি।');
+      }
+    } catch (e: any) {
+      alert('SOP লোড করতে সমস্যা হয়েছে: ' + e.message);
+    }
+  };
 
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -340,6 +381,8 @@ export const App: React.FC = () => {
       {/* Top Application Navbar */}
       <Navbar
         currentUser={currentUser}
+        notifications={notifications}
+        onSelectSopById={handleSelectSopById}
         onOpenLogin={() => setIsLoginModalOpen(true)}
         onLogout={handleLogout}
         onOpenWorkspace={() => setIsWorkspaceModalOpen(true)}

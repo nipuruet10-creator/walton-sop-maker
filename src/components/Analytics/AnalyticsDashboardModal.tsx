@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { SOPDocument } from '../../types/sop';
 import { getAllSOPs } from '../../services/storageService';
 import {
@@ -102,8 +103,8 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
   // Available Years
   const availableYears = [2025, 2026, 2027];
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-in fade-in duration-200">
       <div className="bg-white border border-slate-200 w-full max-w-5xl max-h-[92vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-blue-950">
@@ -329,6 +330,7 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
