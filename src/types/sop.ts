@@ -1,3 +1,5 @@
+import type { SOPStatus, AuditLogEntry } from './auth';
+
 export interface SOPPhoto {
   id: string;
   url: string;
@@ -66,6 +68,19 @@ export interface SOPToolRow {
 }
 
 export interface SOPDocument {
+  id?: string;
+  status?: SOPStatus;
+  authorId?: string;
+  authorName?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  checkedById?: string;
+  checkedByName?: string;
+  checkedAt?: string;
+  approvedById?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
   header: SOPHeader;
   photos: SOPPhoto[];
   procedure: SOPProcedure;
@@ -75,4 +90,6 @@ export interface SOPDocument {
   imageFit?: 'contain' | 'cover';
   gridCols?: number;
   stepFontSize?: 'auto' | 'compact' | 'normal' | 'large' | 'xlarge';
+  qualityFontSize?: 'auto' | 'compact' | 'normal' | 'large';
+  auditTrail?: AuditLogEntry[];
 }

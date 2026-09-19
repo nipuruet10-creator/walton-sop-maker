@@ -17,6 +17,8 @@ interface BanglishProcedureEditorProps {
   onOpenAiModal?: () => void;
   stepFontSize?: 'auto' | 'compact' | 'normal' | 'large' | 'xlarge';
   onFontSizeChange?: (size: 'auto' | 'compact' | 'normal' | 'large' | 'xlarge') => void;
+  qualityFontSize?: 'auto' | 'compact' | 'normal' | 'large';
+  onQualityFontSizeChange?: (size: 'auto' | 'compact' | 'normal' | 'large') => void;
 }
 
 const PRESET_TEMPLATES = [
@@ -51,6 +53,8 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
   onOpenAiModal,
   stepFontSize = 'auto',
   onFontSizeChange,
+  qualityFontSize = 'auto',
+  onQualityFontSizeChange,
 }) => {
   const [autoConvert, setAutoConvert] = useState<boolean>(false);
   const debounceTimerRef = useRef<any>(null);
@@ -314,18 +318,50 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
 
       {/* লক্ষণীয় বিষয় (Quality Points) */}
       <div className="space-y-2.5 pt-2 border-t border-slate-200">
-        <div className="flex items-center justify-between border-b pb-1">
+        <div className="flex items-center justify-between border-b pb-1 gap-2 flex-wrap">
           <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             <span>লক্ষণীয় বিষয় (Critical Quality Points)</span>
           </h3>
-          <button
-            type="button"
-            onClick={handleAddQuality}
-            className="flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-700 font-semibold cursor-pointer"
-          >
-            <Plus className="w-3 h-3" /> Add Point
-          </button>
+
+          <div className="flex items-center gap-2">
+            {/* Font Size Selector for Quality Points */}
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px]">
+              <span className="flex items-center gap-0.5 px-1 font-semibold text-slate-500">
+                <Type className="w-3 h-3 text-amber-600" />
+                <span>সাইজ:</span>
+              </span>
+              {(
+                [
+                  { id: 'auto', label: 'Auto' },
+                  { id: 'compact', label: 'ছোট' },
+                  { id: 'normal', label: 'স্বাভাবিক' },
+                  { id: 'large', label: 'বড়' },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => onQualityFontSizeChange?.(opt.id)}
+                  className={`px-1.5 py-0.5 rounded transition cursor-pointer font-medium ${
+                    (qualityFontSize || 'auto') === opt.id
+                      ? 'bg-amber-600 text-white font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-950 hover:bg-slate-200'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAddQuality}
+              className="flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-700 font-semibold cursor-pointer"
+            >
+              <Plus className="w-3 h-3" /> Add Point
+            </button>
+          </div>
         </div>
 
         {/* Dedicated Quality Points AI Generator Box */}

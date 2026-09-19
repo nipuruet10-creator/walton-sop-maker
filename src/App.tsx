@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { SOPDocument } from './types/sop';
+import type { UserProfile } from './types/auth';
 import { defaultSopData } from './data/defaultSopData';
 import { Navbar } from './components/Navbar';
+import { WorkflowActionBar } from './components/Workflow/WorkflowActionBar';
 import { ImageManager } from './components/InputPanel/ImageManager';
 import { BanglishProcedureEditor } from './components/InputPanel/BanglishProcedureEditor';
 import { HeaderEditor } from './components/InputPanel/HeaderEditor';
@@ -9,6 +11,11 @@ import { SafetyEditor } from './components/InputPanel/SafetyEditor';
 import { TablesEditor } from './components/InputPanel/TablesEditor';
 import { SOPPaper } from './components/Preview/SOPPaper';
 import { ApiKeyModal } from './components/Modals/ApiKeyModal';
+import { LoginModal } from './components/Auth/LoginModal';
+import { UserWorkspaceModal } from './components/Workspace/UserWorkspaceModal';
+import { ConcernSectionView } from './components/Archive/ConcernSectionView';
+import { AnalyticsDashboardModal } from './components/Analytics/AnalyticsDashboardModal';
+import { AdminPanelModal } from './components/Admin/AdminPanelModal';
 import {
   generateSOPWithGemini,
   offlineConvertBanglish,
@@ -20,6 +27,11 @@ import {
   OPENROUTER_API_KEY_STORAGE,
   OPENROUTER_MODEL_STORAGE,
 } from './services/openrouterService';
+import {
+  getActiveUserSession,
+  setActiveUserSession,
+  INITIAL_USERS,
+} from './services/storageService';
 import { exportSOPToExcel } from './services/excelExporter';
 import { downloadSOPAsPdf } from './services/pdfExporter';
 import confetti from 'canvas-confetti';
@@ -44,7 +56,7 @@ const AI_PROVIDER_STORAGE = 'walton_sop_ai_provider';
 type ActiveTab = 'photos' | 'procedure' | 'header' | 'safety' | 'tables';
 
 export const App: React.FC = () => {
-  // State
+  // Current SOP document state
   const [data, setData] = useState<SOPDocument>(() => {
     try {
       const cached = localStorage.getItem(STORAGE_KEY);
@@ -54,6 +66,18 @@ export const App: React.FC = () => {
     }
     return defaultSopData;
   });
+
+  // User session state (Biplob as default starting user)
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    return getActiveUserSession() || INITIAL_USERS.find((u) => u.id === 'Biplob') || null;
+  });
+
+  // Modals state
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState<boolean>(false);
+  const [isConcernSectionOpen, setIsConcernSectionOpen] = useState<boolean>(false);
+  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState<boolean>(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
 
   // OpenRouter & Gemini AI Settings
   const [openRouterKey, setOpenRouterKey] = useState<string>(() => {
@@ -80,7 +104,7 @@ export const App: React.FC = () => {
 
   const importFileRef = useRef<HTMLInputElement>(null);
 
-  // Auto-save to localStorage
+  // Auto-save to localStorage and IndexedDB
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -100,6 +124,16 @@ export const App: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  const handleLoginSuccess = (user: UserProfile) => {
+    setCurrentUser(user);
+    setActiveUserSession(user);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setActiveUserSession(null);
+  };
 
   const handleSaveAiConfig = (config: {
     openRouterKey: string;
@@ -152,11 +186,7 @@ export const App: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleImportJson = () => {
-    importFileRef.current?.click();
-  };
-
-  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -164,186 +194,163 @@ export const App: React.FC = () => {
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
-        if (parsed.header && parsed.photos && parsed.procedure) {
+        if (parsed.header && parsed.procedure) {
           setData(parsed);
-          alert('SOP document successfully loaded!');
+          alert('SOP JSON data loaded successfully!');
         } else {
-          alert('Invalid SOP JSON format.');
+          alert('Invalid SOP JSON structure.');
         }
       } catch (err) {
         alert('Failed to parse JSON file.');
       }
-      if (importFileRef.current) importFileRef.current.value = '';
     };
     reader.readAsText(file);
+    if (importFileRef.current) importFileRef.current.value = '';
   };
 
   const handleReset = () => {
-    if (confirm('Reset document to Walton sample default data? Any unsaved changes will be lost.')) {
+    if (confirm('Are you sure you want to reset to the Walton sample SOP? Any unsaved edits will be lost.')) {
       setData(defaultSopData);
     }
   };
 
-  // Banglish to 100% Bengali SOP generation using OpenRouter AI / Gemini / Offline
+  const handleNewSop = () => {
+    setData({
+      ...defaultSopData,
+      id: undefined,
+      status: 'draft',
+      authorId: currentUser?.id || 'Biplob',
+      authorName: currentUser?.name || 'Biplob Hossain',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      header: {
+        ...defaultSopData.header,
+        processName: 'New Assembly Process',
+        effectiveDate: new Date().toISOString().split('T')[0],
+        preparedBy: {
+          name: currentUser?.name || 'Biplob Hossain',
+          designation: currentUser?.designation || 'Process Engineer',
+          dept: currentUser?.department || 'Process Automation',
+          date: new Date().toISOString().split('T')[0],
+          signatureImg: currentUser?.defaultSignatureImg,
+        },
+      },
+    });
+  };
+
+  // Main Procedure Step Generation
   const handleAutoGenerate = async () => {
-    if (!data.procedure.banglishInput.trim()) {
-      alert('Please enter your procedure steps in Banglish inside the procedure tab first.');
-      setActiveTab('procedure');
+    const input = data.procedure.banglishInput;
+    if (!input || input.trim() === '') {
+      alert('Please write or paste your Banglish notes in the editor first!');
       return;
     }
 
     setIsGenerating(true);
     try {
-      if (activeProvider === 'openrouter' && openRouterKey.trim()) {
-        const result = await generateSOPWithOpenRouter(
-          data.procedure.banglishInput,
-          openRouterKey.trim(),
-          openRouterModel,
-          data.photos.length
-        );
-        setData(prev => ({
-          ...prev,
-          procedure: {
-            ...prev.procedure,
-            steps: result.steps,
-            qualityPoints: result.qualityPoints,
-            generalInstructions: result.generalInstructions,
-          },
-        }));
-        confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
-      } else if (activeProvider === 'gemini' && geminiKey.trim()) {
-        const result = await generateSOPWithGemini(
-          data.procedure.banglishInput,
-          geminiKey.trim(),
-          data.photos.length
-        );
-        setData(prev => ({
-          ...prev,
-          procedure: {
-            ...prev.procedure,
-            steps: result.steps,
-            qualityPoints: result.qualityPoints,
-            generalInstructions: result.generalInstructions,
-          },
-        }));
-        confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
-      } else if (openRouterKey.trim()) {
-        // Fallback to openrouter if key exists regardless of active provider
-        const result = await generateSOPWithOpenRouter(
-          data.procedure.banglishInput,
-          openRouterKey.trim(),
-          openRouterModel,
-          data.photos.length
-        );
-        setData(prev => ({
-          ...prev,
-          procedure: {
-            ...prev.procedure,
-            steps: result.steps,
-            qualityPoints: result.qualityPoints,
-            generalInstructions: result.generalInstructions,
-          },
-        }));
-        confetti({ particleCount: 70, spread: 80, origin: { y: 0.6 } });
+      let result;
+      if (activeProvider === 'gemini' && geminiKey) {
+        result = await generateSOPWithGemini(input, geminiKey, data.photos.length);
+      } else if (openRouterKey) {
+        result = await generateSOPWithOpenRouter(input, openRouterKey, openRouterModel, data.photos.length);
       } else {
-        // Use comprehensive offline converter
-        const result = offlineConvertBanglish(data.procedure.banglishInput);
-        setData(prev => ({
-          ...prev,
-          procedure: {
-            ...prev.procedure,
-            steps: result.steps,
-            qualityPoints: result.qualityPoints,
-            generalInstructions: result.generalInstructions,
-          },
-        }));
-        confetti({ particleCount: 40, spread: 50, origin: { y: 0.6 } });
+        result = offlineConvertBanglish(input);
       }
-    } catch (err: any) {
-      alert(`AI Notice: ${err.message || 'Error running AI'}. Falling back to offline converter.`);
-      const result = offlineConvertBanglish(data.procedure.banglishInput);
-      setData(prev => ({
+
+      setData((prev) => ({
         ...prev,
         procedure: {
           ...prev.procedure,
-          steps: result.steps,
-          qualityPoints: result.qualityPoints,
-          generalInstructions: result.generalInstructions,
+          steps: result.steps.length > 0 ? result.steps : prev.procedure.steps,
+          qualityPoints:
+            result.qualityPoints.length > 0 ? result.qualityPoints : prev.procedure.qualityPoints,
+          generalInstructions:
+            result.generalInstructions.length > 0
+              ? result.generalInstructions
+              : prev.procedure.generalInstructions,
         },
       }));
+
+      try {
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.8 },
+        });
+      } catch {}
+    } catch (err: any) {
+      alert('Procedure generation failed: ' + (err.message || 'Unknown error'));
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Dedicated Critical Quality Points (লক্ষণীয় বিষয়) AI Generation
+  // Dedicated Critical Quality Points Generation
   const handleAutoGenerateQuality = async () => {
-    const input = data.procedure.qualityBanglishInput || '';
-    if (!input.trim()) {
-      alert('Please enter your Critical Quality Points in Banglish/English in the box first.');
+    const input = data.procedure.qualityBanglishInput;
+    if (!input || input.trim() === '') {
+      alert('Please enter Banglish notes in the Critical Quality Points box first!');
       return;
     }
 
     setIsGeneratingQuality(true);
     try {
-      if (openRouterKey.trim()) {
-        const points = await generateQualityPointsWithOpenRouter(
-          input,
-          openRouterKey.trim(),
-          openRouterModel
-        );
-        setData(prev => ({
-          ...prev,
-          procedure: {
-            ...prev.procedure,
-            qualityPoints: points,
-          },
-        }));
-        confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+      let points: string[];
+      if (openRouterKey) {
+        points = await generateQualityPointsWithOpenRouter(input, openRouterKey, openRouterModel);
       } else {
-        const points = offlineConvertQualityPoints(input);
-        setData(prev => ({
+        points = offlineConvertQualityPoints(input);
+      }
+
+      if (points && points.length > 0) {
+        setData((prev) => ({
           ...prev,
           procedure: {
             ...prev.procedure,
             qualityPoints: points,
           },
         }));
-        confetti({ particleCount: 30, spread: 40, origin: { y: 0.7 } });
+
+        try {
+          confetti({
+            particleCount: 35,
+            spread: 50,
+            origin: { y: 0.8 },
+          });
+        } catch {}
       }
     } catch (err: any) {
-      alert(`Quality Points AI Notice: ${err.message || 'Error running AI'}. Falling back to offline converter.`);
-      const points = offlineConvertQualityPoints(input);
-      setData(prev => ({
-        ...prev,
-        procedure: {
-          ...prev.procedure,
-          qualityPoints: points,
-        },
-      }));
+      alert('Quality points generation failed: ' + (err.message || 'Unknown error'));
     } finally {
       setIsGeneratingQuality(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-200 text-slate-900 selection:bg-blue-600 selection:text-white">
-      {/* Hidden Import Input */}
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-200 font-sans select-none print:h-auto print:overflow-visible print:bg-white">
+      {/* Hidden file input for JSON import */}
       <input
         type="file"
         ref={importFileRef}
-        onChange={handleImportFile}
-        accept=".json"
+        onChange={handleImportJson}
+        accept=".json,application/json"
         className="hidden"
       />
 
-      {/* Top Navbar */}
+      {/* Top Application Navbar */}
       <Navbar
+        currentUser={currentUser}
+        onOpenLogin={() => setIsLoginModalOpen(true)}
+        onLogout={handleLogout}
+        onOpenWorkspace={() => setIsWorkspaceModalOpen(true)}
+        onOpenConcernSection={() => setIsConcernSectionOpen(true)}
+        onOpenAnalytics={() => setIsAnalyticsModalOpen(true)}
+        onOpenAdminPanel={() => setIsAdminModalOpen(true)}
         onPrint={handlePrint}
         onDownloadPdf={handleDownloadPdf}
         onExportExcel={handleExportExcel}
         onExportJson={handleExportJson}
-        onImportJson={handleImportJson}
+        onImportJson={() => importFileRef.current?.click()}
         onReset={handleReset}
         onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
         hasApiKey={Boolean(openRouterKey || geminiKey)}
@@ -356,27 +363,45 @@ export const App: React.FC = () => {
         isDownloadingPdf={isDownloadingPdf}
       />
 
-      {/* Main Workspace (Split View) */}
+      {/* Workflow & Approval Status Action Bar */}
+      <WorkflowActionBar
+        currentSop={data}
+        currentUser={currentUser}
+        onUpdateSop={(updated) => setData(updated)}
+        onOpenWorkspace={() => setIsWorkspaceModalOpen(true)}
+        onOpenLogin={() => setIsLoginModalOpen(true)}
+      />
+
+      {/* Main Workspace Area (Left Input Panel + Right Live Canvas) */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Left Side: Input Panel */}
+        {/* Left Side: Input Panel (Collapsible) */}
         <aside
-          className={`no-print bg-white border-r border-slate-300 flex flex-col transition-all duration-300 z-20 shrink-0 ${
-            isSidebarOpen ? 'w-full sm:w-[420px] lg:w-[480px]' : 'w-0'
+          className={`no-print transition-all duration-300 ease-in-out bg-white border-r border-slate-300 flex flex-col z-20 shrink-0 ${
+            isSidebarOpen ? 'w-[420px] lg:w-[480px]' : 'w-0'
           }`}
+          style={{ overflow: isSidebarOpen ? 'visible' : 'hidden' }}
         >
           {isSidebarOpen && (
             <div className="flex flex-col h-full overflow-hidden">
-              {/* Quick Export Bar in Panel */}
-              <div className="bg-slate-900 px-3 py-2 flex items-center justify-between gap-2 border-b border-slate-800 text-white">
-                <span className="text-[11px] font-semibold text-slate-300">Quick Download:</span>
-                <div className="flex items-center gap-2">
+              {/* Panel Header & Quick Actions */}
+              <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                <div>
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                    SOP Parameter Editor
+                  </h2>
+                  <p className="text-[10px] text-slate-400">
+                    ছবি আপলোড, বাংলিশ প্রসিডিউর, হেডার ও টেবিল
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={handleExportExcel}
                     className="flex items-center gap-1 bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-1 rounded transition cursor-pointer"
                   >
-                    <FileSpreadsheet className="w-3 h-3 text-emerald-300" />
-                    <span>Excel (.xlsx)</span>
+                    <FileSpreadsheet className="w-3 h-3 text-emerald-200" />
+                    <span>Excel</span>
                   </button>
                   <button
                     type="button"
@@ -485,6 +510,10 @@ export const App: React.FC = () => {
                     onOpenAiModal={() => setIsApiKeyModalOpen(true)}
                     stepFontSize={data.stepFontSize || 'auto'}
                     onFontSizeChange={(stepFontSize) => setData((prev) => ({ ...prev, stepFontSize }))}
+                    qualityFontSize={data.qualityFontSize || 'auto'}
+                    onQualityFontSizeChange={(qualityFontSize) =>
+                      setData((prev) => ({ ...prev, qualityFontSize }))
+                    }
                   />
                 )}
 
@@ -530,11 +559,11 @@ export const App: React.FC = () => {
         <main className="flex-1 bg-slate-300/80 overflow-auto flex flex-col items-center justify-start p-6 md:p-10 relative">
           {/* Quick Floating Document Bar */}
           <div className="no-print mb-4 flex flex-wrap items-center justify-center gap-3 bg-white/95 backdrop-blur-xs px-4 py-2 rounded-xl shadow-md border border-slate-200 text-xs shrink-0 z-10">
-            {/* Font Size Adjust */}
+            {/* Step Font Size Adjust */}
             <div className="flex items-center gap-1.5">
               <span className="flex items-center gap-1 font-semibold text-slate-700">
                 <Type className="w-3.5 h-3.5 text-blue-600" />
-                <span>ফন্ট সাইজ:</span>
+                <span>কার্যপ্রণালী সাইজ:</span>
               </span>
               <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                 {(
@@ -553,6 +582,39 @@ export const App: React.FC = () => {
                     className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
                       (data.stepFontSize || 'auto') === opt.id
                         ? 'bg-blue-600 text-white shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+
+            {/* Quality Points Font Size Adjust */}
+            <div className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1 font-semibold text-amber-800">
+                <Sparkles className="w-3 h-3 text-amber-500" />
+                <span>লক্ষণীয় বিষয় সাইজ:</span>
+              </span>
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                {(
+                  [
+                    { id: 'auto', label: 'Auto' },
+                    { id: 'compact', label: 'ছোট' },
+                    { id: 'normal', label: 'স্বাভাবিক' },
+                    { id: 'large', label: 'বড়' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setData((prev) => ({ ...prev, qualityFontSize: opt.id }))}
+                    className={`px-1.5 py-0.5 rounded text-[10.5px] font-medium transition cursor-pointer ${
+                      (data.qualityFontSize || 'auto') === opt.id
+                        ? 'bg-amber-600 text-white shadow-xs font-bold'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
                     }`}
                   >
@@ -656,7 +718,7 @@ export const App: React.FC = () => {
         </main>
       </div>
 
-      {/* AI Configuration Modal (OpenRouter & Gemini) */}
+      {/* AI Configuration Modal */}
       <ApiKeyModal
         isOpen={isApiKeyModalOpen}
         onClose={() => setIsApiKeyModalOpen(false)}
@@ -665,6 +727,43 @@ export const App: React.FC = () => {
         geminiKey={geminiKey}
         activeProvider={activeProvider}
         onSaveConfig={handleSaveAiConfig}
+      />
+
+      {/* Authentication Login Modal */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
+
+      {/* User Personal Workspace Modal */}
+      <UserWorkspaceModal
+        isOpen={isWorkspaceModalOpen}
+        onClose={() => setIsWorkspaceModalOpen(false)}
+        currentUser={currentUser}
+        onSelectSop={(sop) => setData(sop)}
+        onNewSop={handleNewSop}
+        onOpenLogin={() => setIsLoginModalOpen(true)}
+      />
+
+      {/* Concern Section / Approved Archive Modal */}
+      <ConcernSectionView
+        isOpen={isConcernSectionOpen}
+        onClose={() => setIsConcernSectionOpen(false)}
+        onViewOnCanvas={(sop) => setData(sop)}
+      />
+
+      {/* Analytics & Performance Dashboard Modal */}
+      <AnalyticsDashboardModal
+        isOpen={isAnalyticsModalOpen}
+        onClose={() => setIsAnalyticsModalOpen(false)}
+      />
+
+      {/* Admin Panel Modal */}
+      <AdminPanelModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        currentUser={currentUser}
       />
     </div>
   );

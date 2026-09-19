@@ -1,7 +1,21 @@
-import React, { useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { SOPPhoto } from '../../types/sop';
 import { toBengaliNumber } from '../../data/defaultSopData';
-import { Upload, ArrowUp, ArrowDown, Trash2, RefreshCw, Image as ImageIcon, AlertCircle, LayoutGrid, Maximize } from 'lucide-react';
+import { PhotoAnnotatorModal } from '../Modals/PhotoAnnotatorModal';
+import {
+  Upload,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
+  RefreshCw,
+  Image as ImageIcon,
+  AlertCircle,
+  LayoutGrid,
+  Maximize,
+  Layers,
+  ClipboardPaste,
+  Sparkles,
+} from 'lucide-react';
 
 interface ImageManagerProps {
   photos: SOPPhoto[];
@@ -24,6 +38,16 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const replaceTargetIndex = useRef<number | null>(null);
 
+  // Annotation state
+  const [annotatingIndex, setAnnotatingIndex] = useState<number | null>(null);
+  const [isDragOver, setIsDragOver] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
   // Re-index photo labels: চিত্র-১, চিত্র-২ ...
   const reindex = (list: SOPPhoto[]): SOPPhoto[] => {
     return list.map((p, idx) => ({
@@ -32,37 +56,88 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
     }));
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // Global Clipboard Paste listener (Ctrl+V)
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
 
+      const imageFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) imageFiles.push(file);
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        processNewFiles(imageFiles, 'ক্লিপবোর্ড থেকে ছবি পেস্ট করা হয়েছে!');
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [photos]);
+
+  const processNewFiles = (files: File[], successMsg: string) => {
     const remainingSlots = 9 - photos.length;
     if (remainingSlots <= 0) {
-      alert('Maximum 9 photos are supported in the A4 SOP layout.');
+      alert('SOP লেআউটে সর্বোচ্চ ৯টি ছবি যুক্ত করা যাবে।');
       return;
     }
 
     const filesToRead = Array.from(files).slice(0, remainingSlots);
     const newPhotos: SOPPhoto[] = [];
-
     let processed = 0;
+
     filesToRead.forEach((file, i) => {
       const reader = new FileReader();
       reader.onload = (event) => {
         newPhotos.push({
-          id: `photo-${Date.now()}-${i}`,
+          id: `photo-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 5)}`,
           url: event.target?.result as string,
           label: '',
-          name: file.name,
+          name: file.name || `Pasted Image ${photos.length + i + 1}`,
         });
         processed++;
         if (processed === filesToRead.length) {
           onChange(reindex([...photos, ...newPhotos]));
+          showToast(successMsg);
           if (fileInputRef.current) fileInputRef.current.value = '';
         }
       };
       reader.readAsDataURL(file);
     });
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    processNewFiles(Array.from(files), 'ছবি সফলভাবে আপলোড হয়েছে!');
+  };
+
+  // Drag & Drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
+      if (imageFiles.length > 0) {
+        processNewFiles(imageFiles, 'ড্র্যাগ অ্যান্ড ড্রপ ছবি যুক্ত হয়েছে!');
+      }
+    }
   };
 
   const handleReplace = (index: number) => {
@@ -83,6 +158,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         name: file.name,
       };
       onChange(reindex(updated));
+      showToast('ছবি সফলভাবে পরিবর্তন করা হয়েছে!');
       if (replaceInputRef.current) replaceInputRef.current.value = '';
       replaceTargetIndex.current = null;
     };
@@ -102,7 +178,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
 
   const handleDelete = (index: number) => {
     if (photos.length <= 4) {
-      if (!confirm('The recommended layout requires at least 4 photos. Are you sure you want to remove this photo?')) {
+      if (!confirm('SOP লেআউটের জন্য কমপক্ষে ৪টি ছবি রাখা বাঞ্ছনীয়। আপনি কি নিশ্চিত যে ছবিটি মুছতে চান?')) {
         return;
       }
     }
@@ -110,8 +186,28 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
     onChange(reindex(updated));
   };
 
+  const handleSaveAnnotatedPhoto = (annotatedBase64: string) => {
+    if (annotatingIndex === null) return;
+    const updated = [...photos];
+    updated[annotatingIndex] = {
+      ...updated[annotatingIndex],
+      url: annotatedBase64,
+    };
+    onChange(reindex(updated));
+    showToast('ছবিতে ড্রয়িং ও মার্কিং সফলভাবে সংরক্ষিত হয়েছে!');
+    setAnnotatingIndex(null);
+  };
+
   return (
     <div className="space-y-4">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="bg-emerald-600 text-white text-xs font-semibold px-3 py-2 rounded-xl shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+          <Sparkles className="w-4 h-4 text-emerald-200" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
       {/* Hidden File Inputs */}
       <input
         type="file"
@@ -130,7 +226,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
       />
 
       {/* Header Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2.5">
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-2.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ImageIcon className="w-4 h-4 text-blue-700" />
@@ -141,7 +237,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
           <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-blue-100 text-blue-800">
             {photos.length <= 4 && '2 × 2 Grid'}
             {(photos.length === 5 || photos.length === 6) && '3 × 2 Grid (Standard)'}
-            {(photos.length >= 7) && '3 × 3 Grid (Balanced)'}
+            {photos.length >= 7 && '3 × 3 Grid (Balanced)'}
           </span>
         </div>
 
@@ -150,9 +246,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
           <div>
             <label className="block text-[10.5px] font-semibold text-blue-950 mb-1 flex items-center gap-1">
               <Maximize className="w-3 h-3 text-blue-600" />
-              <span>ছবি অ্যাডজাস্টমেন্ট (Aspect Ratio)</span>
+              <span>ছবি ফিট (Aspect Ratio)</span>
             </label>
-            <div className="flex bg-white rounded border border-blue-300 p-0.5">
+            <div className="flex bg-white rounded-lg border border-blue-300 p-0.5">
               <button
                 type="button"
                 onClick={() => onUpdateFit?.('contain')}
@@ -161,7 +257,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 }`}
                 title="সম্পূর্ণ ছবি দেখাও, কোনো ছবি লম্বা বা চ্যাপ্টা হবে না"
               >
-                Fit (ন্যাচারাল অনুপাত)
+                Fit (ন্যাচারাল)
               </button>
               <button
                 type="button"
@@ -184,7 +280,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
             <select
               value={gridCols}
               onChange={(e) => onUpdateGridCols?.(parseInt(e.target.value, 10))}
-              className="w-full bg-white border border-blue-300 rounded px-2 py-1 text-[11px] text-slate-800 focus:outline-none"
+              className="w-full bg-white border border-blue-300 rounded-lg px-2 py-1 text-[11px] text-slate-800 focus:outline-none"
             >
               <option value={0}>Auto (সঠিক আকার)</option>
               <option value={3}>3 Columns (ওয়ালটন স্ট্যান্ডার্ড)</option>
@@ -194,28 +290,43 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
           </div>
         </div>
 
-        <p className="text-[10.5px] text-blue-800">
-          ছবিগুলো স্বয়ংক্রিয়ভাবে সঠিক অনুপাতে ফ্রেমের ভেতরে বসবে। লম্বা বা বিকৃত হবে না এবং নিচে স্পষ্ট হলুদ নম্বরিং থাকবে।
-        </p>
+        {/* Pro Tip on Paste & Annotate */}
+        <div className="flex items-center gap-1.5 text-[11px] text-blue-800 bg-white/70 p-2 rounded-lg border border-blue-200/60">
+          <ClipboardPaste className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+          <span>
+            <strong>টিপ:</strong> স্ক্রিনশট নিয়ে সরাসরি <strong>Ctrl+V</strong> চাপুন বা ড্র্যাগ করে ফেলুন। ছবিতে লাল বক্স ও তীরচিহ্ন দিতে <strong>"এডিট / চিহ্নিত"</strong> বাটনে ক্লিক করুন।
+          </span>
+        </div>
       </div>
 
       {photos.length < 4 && (
-        <div className="flex items-center gap-2 text-xs bg-amber-50 text-amber-800 p-2.5 rounded border border-amber-200">
+        <div className="flex items-center gap-2 text-xs bg-amber-50 text-amber-800 p-2.5 rounded-xl border border-amber-200">
           <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
           <span>অনুকূল SOP ডিজাইনের জন্য কমপক্ষে ৪টি ছবি আপলোড করার পরামর্শ দেওয়া হচ্ছে।</span>
         </div>
       )}
 
-      {/* Upload Drop Button */}
+      {/* Drag & Drop Upload Zone */}
       {photos.length < 9 && (
-        <button
-          type="button"
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50 text-slate-700 hover:text-blue-700 p-3.5 rounded-xl transition cursor-pointer group text-xs font-semibold"
+          className={`w-full flex flex-col items-center justify-center gap-1.5 border-2 border-dashed p-4 rounded-xl transition cursor-pointer group text-xs text-center ${
+            isDragOver
+              ? 'border-blue-600 bg-blue-100/60 scale-[1.01]'
+              : 'border-slate-300 hover:border-blue-500 bg-slate-50 hover:bg-blue-50/50'
+          }`}
         >
-          <Upload className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition" />
-          <span>+ নতুন ছবি আপলোড করুন ({9 - photos.length} টি বাকি আছে)</span>
-        </button>
+          <div className="flex items-center gap-2 text-slate-700 group-hover:text-blue-700 font-semibold">
+            <Upload className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition" />
+            <span>+ নতুন ছবি আপলোড করুন ({9 - photos.length} টি বাকি)</span>
+          </div>
+          <p className="text-[10.5px] text-slate-500">
+            এখানে ছবি ড্র্যাগ ও ড্রপ করুন অথবা কপি করে সরাসরি <kbd className="px-1.5 py-0.5 bg-slate-200 text-slate-800 rounded font-mono text-[10px]">Ctrl+V</kbd> পেস্ট করুন
+          </p>
+        </div>
       )}
 
       {/* Photo List & Order Manager */}
@@ -223,10 +334,10 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         {photos.map((photo, index) => (
           <div
             key={photo.id}
-            className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-200 hover:border-blue-300 shadow-xs transition"
+            className="flex items-center gap-2.5 p-2 bg-white rounded-xl border border-slate-200 hover:border-blue-300 shadow-xs transition"
           >
             {/* Thumbnail */}
-            <div className="relative w-16 h-12 rounded overflow-hidden bg-slate-100 shrink-0 border border-slate-300 flex items-center justify-center">
+            <div className="relative w-16 h-12 rounded-lg overflow-hidden bg-slate-100 shrink-0 border border-slate-300 flex items-center justify-center">
               <img
                 src={photo.url}
                 alt={photo.label}
@@ -252,13 +363,24 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
               </span>
             </div>
 
-            {/* Actions: Move Up / Down, Replace, Delete */}
+            {/* Actions: Annotate, Move Up/Down, Replace, Delete */}
             <div className="flex items-center gap-1 shrink-0">
+              {/* Annotate / Mark Button */}
+              <button
+                type="button"
+                onClick={() => setAnnotatingIndex(index)}
+                className="flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                title="ছবিতে লাল বক্স, তীরচিহ্ন, ও ড্রয়িং যোগ করুন"
+              >
+                <Layers className="w-3.5 h-3.5 text-red-600" />
+                <span className="hidden sm:inline">চিহ্নিত করুন</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => handleMove(index, 'up')}
                 disabled={index === 0}
-                className="p-1 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded disabled:opacity-30 transition cursor-pointer"
+                className="p-1 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg disabled:opacity-30 transition cursor-pointer"
                 title="উপরে নিন"
               >
                 <ArrowUp className="w-3.5 h-3.5" />
@@ -267,7 +389,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 type="button"
                 onClick={() => handleMove(index, 'down')}
                 disabled={index === photos.length - 1}
-                className="p-1 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded disabled:opacity-30 transition cursor-pointer"
+                className="p-1 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg disabled:opacity-30 transition cursor-pointer"
                 title="নিচে নিন"
               >
                 <ArrowDown className="w-3.5 h-3.5" />
@@ -275,7 +397,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
               <button
                 type="button"
                 onClick={() => handleReplace(index)}
-                className="p-1 text-slate-500 hover:text-emerald-600 hover:bg-slate-100 rounded transition cursor-pointer"
+                className="p-1 text-slate-500 hover:text-emerald-600 hover:bg-slate-100 rounded-lg transition cursor-pointer"
                 title="ছবি পরিবর্তন করুন"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -283,7 +405,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
               <button
                 type="button"
                 onClick={() => handleDelete(index)}
-                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition cursor-pointer"
+                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
                 title="ছবি মুছুন"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -292,6 +414,17 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
           </div>
         ))}
       </div>
+
+      {/* Photo Annotator Canvas Modal */}
+      {annotatingIndex !== null && photos[annotatingIndex] && (
+        <PhotoAnnotatorModal
+          isOpen={true}
+          onClose={() => setAnnotatingIndex(null)}
+          imageUrl={photos[annotatingIndex].url}
+          photoLabel={photos[annotatingIndex].label}
+          onSave={handleSaveAnnotatedPhoto}
+        />
+      )}
     </div>
   );
 };

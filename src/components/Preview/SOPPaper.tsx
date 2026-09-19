@@ -18,7 +18,7 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
   onUpdateQuality,
   onUpdateGeneral,
 }) => {
-  const { header, photos, procedure, safety, parts, tools, imageFit = 'contain', gridCols = 0, stepFontSize = 'auto' } = data;
+  const { header, photos, procedure, safety, parts, tools, imageFit = 'contain', gridCols = 0, stepFontSize = 'auto', qualityFontSize = 'auto' } = data;
   const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
 
   const handleImgError = (id: string) => {
@@ -87,10 +87,22 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
   const getQualityTypography = (points: string[], mode: string = 'auto') => {
     const totalChars = points.reduce((sum, s) => sum + s.length, 0);
     const count = points.length;
-    if (mode === 'compact' || count > 4 || totalChars > 250) {
-      return { container: 'space-y-0.5 p-1.5', text: 'text-[9.5px] leading-[1.3]' };
+
+    if (mode === 'compact') {
+      return { container: 'space-y-0.5 p-1', text: 'text-[9px] leading-[1.3]' };
     }
-    if (mode === 'large' && count <= 2 && totalChars < 120) {
+    if (mode === 'normal') {
+      return { container: 'space-y-1 p-1.5', text: 'text-[10.5px] leading-[1.45]' };
+    }
+    if (mode === 'large') {
+      return { container: 'space-y-1.5 p-2', text: 'text-[12px] leading-[1.65]' };
+    }
+
+    // Auto mode
+    if (count > 4 || totalChars > 250) {
+      return { container: 'space-y-0.5 p-1', text: 'text-[9.5px] leading-[1.3]' };
+    }
+    if (count <= 2 && totalChars < 120) {
       return { container: 'space-y-1.5 p-2', text: 'text-[11.5px] leading-[1.6]' };
     }
     return { container: 'space-y-1 p-1.5', text: 'text-[10.5px] leading-[1.45]' };
@@ -109,7 +121,7 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
   };
 
   const stepStyle = getStepTypography(procedure.steps, stepFontSize);
-  const qualityStyle = getQualityTypography(procedure.qualityPoints, stepFontSize);
+  const qualityStyle = getQualityTypography(procedure.qualityPoints, qualityFontSize);
   const generalStyle = getGeneralTypography(procedure.generalInstructions, stepFontSize);
 
   return (
