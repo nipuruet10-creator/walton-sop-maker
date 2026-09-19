@@ -33,6 +33,8 @@ import {
   ChevronRight,
   FileSpreadsheet,
   FileDown,
+  Type,
+  LayoutGrid,
 } from 'lucide-react';
 
 const STORAGE_KEY = 'walton_sop_current_doc_v2';
@@ -481,6 +483,8 @@ export const App: React.FC = () => {
                     activeProvider={activeProvider}
                     activeModel={openRouterModel}
                     onOpenAiModal={() => setIsApiKeyModalOpen(true)}
+                    stepFontSize={data.stepFontSize || 'auto'}
+                    onFontSizeChange={(stepFontSize) => setData((prev) => ({ ...prev, stepFontSize }))}
                   />
                 )}
 
@@ -523,7 +527,102 @@ export const App: React.FC = () => {
         </button>
 
         {/* Right Side: Live A4 Landscape Canvas */}
-        <main className="flex-1 bg-slate-300/80 overflow-auto flex items-start justify-center p-6 md:p-10 relative">
+        <main className="flex-1 bg-slate-300/80 overflow-auto flex flex-col items-center justify-start p-6 md:p-10 relative">
+          {/* Quick Floating Document Bar */}
+          <div className="no-print mb-4 flex flex-wrap items-center justify-center gap-3 bg-white/95 backdrop-blur-xs px-4 py-2 rounded-xl shadow-md border border-slate-200 text-xs shrink-0 z-10">
+            {/* Font Size Adjust */}
+            <div className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1 font-semibold text-slate-700">
+                <Type className="w-3.5 h-3.5 text-blue-600" />
+                <span>ফন্ট সাইজ:</span>
+              </span>
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                {(
+                  [
+                    { id: 'auto', label: 'Auto' },
+                    { id: 'compact', label: 'ছোট' },
+                    { id: 'normal', label: 'স্বাভাবিক' },
+                    { id: 'large', label: 'বড়' },
+                    { id: 'xlarge', label: 'XL' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setData((prev) => ({ ...prev, stepFontSize: opt.id }))}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
+                      (data.stepFontSize || 'auto') === opt.id
+                        ? 'bg-blue-600 text-white shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+
+            {/* Photo Grid Columns */}
+            <div className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1 font-semibold text-slate-700">
+                <LayoutGrid className="w-3.5 h-3.5 text-blue-600" />
+                <span>গ্রিড:</span>
+              </span>
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                {(
+                  [
+                    { id: 0, label: 'Auto' },
+                    { id: 2, label: '২ কলাম' },
+                    { id: 3, label: '৩ কলাম' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setData((prev) => ({ ...prev, gridCols: opt.id }))}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
+                      (data.gridCols || 0) === opt.id
+                        ? 'bg-blue-600 text-white shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+
+            {/* Image Fit */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-semibold text-slate-700">ছবি ফিট:</span>
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                {(
+                  [
+                    { id: 'contain', label: 'Contain' },
+                    { id: 'cover', label: 'Cover' },
+                  ] as const
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setData((prev) => ({ ...prev, imageFit: opt.id }))}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
+                      (data.imageFit || 'contain') === opt.id
+                        ? 'bg-blue-600 text-white shadow-xs font-bold'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div
             id="sop-paper-wrapper"
             className="transition-transform duration-200 origin-top shadow-2xl rounded-xs print:shadow-none"
@@ -536,6 +635,7 @@ export const App: React.FC = () => {
               onUpdateHeader={(updates) =>
                 setData((prev) => ({ ...prev, header: { ...prev.header, ...updates } }))
               }
+              onUpdateFontSize={(size) => setData((prev) => ({ ...prev, stepFontSize: size }))}
               onUpdateStep={(idx, val) => {
                 const steps = [...data.procedure.steps];
                 steps[idx] = val;

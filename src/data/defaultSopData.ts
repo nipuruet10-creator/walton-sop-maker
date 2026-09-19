@@ -95,17 +95,11 @@ export const defaultSopData: SOPDocument = {
     { sl: 1, name: '', capacity: '', gas: '' },
     { sl: 2, name: '', capacity: '', gas: '' },
     { sl: 3, name: '', capacity: '', gas: '' },
-    { sl: 4, name: '', capacity: '', gas: '' },
-    { sl: 5, name: '', capacity: '', gas: '' },
-    { sl: 6, name: '', capacity: '', gas: '' },
-    { sl: 7, name: '', capacity: '', gas: '' },
   ],
   tools: [
     { sl: 1, name: '', effectiveRange: '' },
     { sl: 2, name: '', effectiveRange: '' },
     { sl: 3, name: '', effectiveRange: '' },
-    { sl: 4, name: '', effectiveRange: '' },
-    { sl: 5, name: '', effectiveRange: '' },
-    { sl: 6, name: '', effectiveRange: '' },
   ],
+  stepFontSize: 'auto',
 };

@@ -8,6 +8,7 @@ interface SOPPaperProps {
   onUpdateStep?: (index: number, val: string) => void;
   onUpdateQuality?: (index: number, val: string) => void;
   onUpdateGeneral?: (index: number, val: string) => void;
+  onUpdateFontSize?: (size: 'auto' | 'compact' | 'normal' | 'large' | 'xlarge') => void;
 }
 
 export const SOPPaper: React.FC<SOPPaperProps> = ({
@@ -17,7 +18,7 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
   onUpdateQuality,
   onUpdateGeneral,
 }) => {
-  const { header, photos, procedure, safety, parts, tools, imageFit = 'contain', gridCols = 0 } = data;
+  const { header, photos, procedure, safety, parts, tools, imageFit = 'contain', gridCols = 0, stepFontSize = 'auto' } = data;
   const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
 
   const handleImgError = (id: string) => {
@@ -45,15 +46,71 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
     }
   };
 
-  // Dynamic step typography calibrated so 4 to 9 steps fill the right column with NO blank gap
-  const getStepTypography = (count: number) => {
-    if (count <= 4) return { container: 'space-y-3 p-3', text: 'text-[13px] leading-[1.8]' };
-    if (count <= 6) return { container: 'space-y-2 p-2.5', text: 'text-[12px] leading-[1.7]' };
-    if (count <= 8) return { container: 'space-y-1.5 p-2', text: 'text-[11px] leading-[1.5]' };
-    return { container: 'space-y-1 p-1.5', text: 'text-[10px] leading-[1.35]' };
+  // Smart dynamic step typography: auto-scales based on both step count and character length
+  // Completely prevents overlapping or clashing with next sections, while filling short text nicely
+  const getStepTypography = (steps: string[], mode: string = 'auto') => {
+    const count = steps.length;
+    const totalChars = steps.reduce((sum, s) => sum + s.length, 0);
+
+    if (mode === 'compact') {
+      return { container: 'space-y-1 p-1.5', text: 'text-[9.5px] leading-[1.35]' };
+    }
+    if (mode === 'normal') {
+      return { container: 'space-y-1.5 p-2', text: 'text-[10.5px] leading-[1.5]' };
+    }
+    if (mode === 'large') {
+      return { container: 'space-y-2 p-2.5', text: 'text-[12px] leading-[1.65]' };
+    }
+    if (mode === 'xlarge') {
+      return { container: 'space-y-2.5 p-3', text: 'text-[13px] leading-[1.75]' };
+    }
+
+    // Auto mode: chooses font based on text volume to guarantee perfect fit without overflow
+    if (count <= 2 && totalChars < 120) {
+      return { container: 'space-y-2.5 p-2.5', text: 'text-[13px] leading-[1.8]' };
+    }
+    if (count <= 3 && totalChars < 220) {
+      return { container: 'space-y-2 p-2', text: 'text-[12px] leading-[1.7]' };
+    }
+    if (count <= 4 && totalChars < 300) {
+      return { container: 'space-y-1.5 p-2', text: 'text-[11px] leading-[1.55]' };
+    }
+    if (count <= 5 || totalChars < 480) {
+      return { container: 'space-y-1 p-1.5', text: 'text-[10.5px] leading-[1.45]' };
+    }
+    if (count <= 7 || totalChars < 700) {
+      return { container: 'space-y-1 p-1', text: 'text-[9.5px] leading-[1.35]' };
+    }
+    return { container: 'space-y-0.5 p-1', text: 'text-[9px] leading-[1.25]' };
   };
 
-  const stepStyle = getStepTypography(procedure.steps.length);
+  const getQualityTypography = (points: string[], mode: string = 'auto') => {
+    const totalChars = points.reduce((sum, s) => sum + s.length, 0);
+    const count = points.length;
+    if (mode === 'compact' || count > 4 || totalChars > 250) {
+      return { container: 'space-y-0.5 p-1.5', text: 'text-[9.5px] leading-[1.3]' };
+    }
+    if (mode === 'large' && count <= 2 && totalChars < 120) {
+      return { container: 'space-y-1.5 p-2', text: 'text-[11.5px] leading-[1.6]' };
+    }
+    return { container: 'space-y-1 p-1.5', text: 'text-[10.5px] leading-[1.45]' };
+  };
+
+  const getGeneralTypography = (instructions: string[], mode: string = 'auto') => {
+    const totalChars = instructions.reduce((sum, s) => sum + s.length, 0);
+    const count = instructions.length;
+    if (mode === 'compact' || count > 4 || totalChars > 250) {
+      return { container: 'space-y-0.5 p-1.5', text: 'text-[9px] leading-[1.3]' };
+    }
+    if (mode === 'large' && count <= 2 && totalChars < 120) {
+      return { container: 'space-y-1 p-2', text: 'text-[11px] leading-[1.5]' };
+    }
+    return { container: 'space-y-0.5 p-1.5', text: 'text-[10px] leading-[1.4]' };
+  };
+
+  const stepStyle = getStepTypography(procedure.steps, stepFontSize);
+  const qualityStyle = getQualityTypography(procedure.qualityPoints, stepFontSize);
+  const generalStyle = getGeneralTypography(procedure.generalInstructions, stepFontSize);
 
   return (
     <div
@@ -175,33 +232,41 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
                 </div>
               </div>
 
-              {/* Signatures & Approvals (55%) */}
+              {/* Signatures & Approvals (55% - full area image auto-fit) */}
               <div className="w-[55%] flex flex-row divide-x divide-black">
                 {/* Prepared By */}
-                <div className="flex-1 flex flex-col justify-between p-1 bg-white text-[8.5px] min-h-[58px]">
-                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50">Prepared By</div>
-                  <div className="flex-1 flex flex-col items-center justify-center p-0.5">
+                <div className="flex-1 flex flex-col justify-between p-0.5 bg-white text-[8.5px] min-h-[58px] overflow-hidden">
+                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50 shrink-0">Prepared By</div>
+                  <div className="flex-1 w-full flex items-center justify-center p-0 overflow-hidden min-h-[38px]">
                     {header.preparedBy.signatureImg ? (
-                      <img src={header.preparedBy.signatureImg} alt="Signature" className="max-h-7 max-w-full object-contain" />
+                      <img
+                        src={header.preparedBy.signatureImg}
+                        alt="Signature"
+                        className="w-full h-full max-h-[46px] object-contain object-center"
+                      />
                     ) : header.preparedBy.name ? (
-                      <span className="font-semibold text-[8px] text-slate-800 text-center">{header.preparedBy.name}</span>
+                      <span className="font-semibold text-[8px] text-slate-800 text-center px-0.5">{header.preparedBy.name}</span>
                     ) : (
                       <div className="h-5" />
                     )}
                   </div>
                   {header.preparedBy.date && (
-                    <div className="text-[7px] text-slate-400 text-center">{header.preparedBy.date}</div>
+                    <div className="text-[7px] text-slate-400 text-center shrink-0">{header.preparedBy.date}</div>
                   )}
                 </div>
 
                 {/* Checked By */}
-                <div className="flex-1 flex flex-col justify-between p-1 bg-white text-[8.5px] min-h-[58px]">
-                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50">Checked By</div>
-                  <div className="flex-1 flex flex-col items-center justify-center p-0.5">
+                <div className="flex-1 flex flex-col justify-between p-0.5 bg-white text-[8.5px] min-h-[58px] overflow-hidden">
+                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50 shrink-0">Checked By</div>
+                  <div className="flex-1 w-full flex items-center justify-center p-0 overflow-hidden min-h-[38px]">
                     {header.checkedBy.signatureImg ? (
-                      <img src={header.checkedBy.signatureImg} alt="Signature" className="max-h-7 max-w-full object-contain" />
+                      <img
+                        src={header.checkedBy.signatureImg}
+                        alt="Signature"
+                        className="w-full h-full max-h-[46px] object-contain object-center"
+                      />
                     ) : header.checkedBy.name ? (
-                      <span className="font-semibold text-[8px] text-slate-800 text-center">{header.checkedBy.name}</span>
+                      <span className="font-semibold text-[8px] text-slate-800 text-center px-0.5">{header.checkedBy.name}</span>
                     ) : (
                       <div className="h-5" />
                     )}
@@ -209,13 +274,17 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
                 </div>
 
                 {/* Approved By */}
-                <div className="flex-1 flex flex-col justify-between p-1 bg-white text-[8.5px] min-h-[58px]">
-                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50">Approved By</div>
-                  <div className="flex-1 flex flex-col items-center justify-center p-0.5">
+                <div className="flex-1 flex flex-col justify-between p-0.5 bg-white text-[8.5px] min-h-[58px] overflow-hidden">
+                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50 shrink-0">Approved By</div>
+                  <div className="flex-1 w-full flex items-center justify-center p-0 overflow-hidden min-h-[38px]">
                     {header.approvedBy.signatureImg ? (
-                      <img src={header.approvedBy.signatureImg} alt="Signature" className="max-h-7 max-w-full object-contain" />
+                      <img
+                        src={header.approvedBy.signatureImg}
+                        alt="Signature"
+                        className="w-full h-full max-h-[46px] object-contain object-center"
+                      />
                     ) : header.approvedBy.name ? (
-                      <span className="font-semibold text-[8px] text-slate-800 text-center">{header.approvedBy.name}</span>
+                      <span className="font-semibold text-[8px] text-slate-800 text-center px-0.5">{header.approvedBy.name}</span>
                     ) : (
                       <div className="h-5" />
                     )}
@@ -250,7 +319,7 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
         </div>
       </div>
 
-      {/* 2. MAIN BODY (TWO COLUMNS: BALANCED PHOTOS & PURE BENGALI PROCEDURES) */}
+      {/* 2. MAIN BODY (TWO COLUMNS: EXPANDED PHOTOS & PURE BENGALI PROCEDURES) */}
       <div className="flex-1 flex flex-row divide-x-2 divide-black min-h-0 overflow-hidden w-full">
         {/* Left Column: Fixed 4-9 Photograph Grid with Natural Proportions (50%) */}
         <div className="w-1/2 flex flex-col min-h-0">
@@ -303,8 +372,8 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
 
         {/* Right Column: Work Procedures & Directives (50%) */}
         <div className="w-1/2 flex flex-col min-h-0 divide-y divide-black font-bengali">
-          {/* 2.1 কার্যপ্রণালী (Procedure Steps in 100% Pure Bengali - Balanced to eliminate blank gap) */}
-          <div className="flex-[3.2] flex flex-col min-h-0">
+          {/* 2.1 কার্যপ্রণালী (Expanded space, smart auto-fitting font, no border clashing) */}
+          <div className="flex-[3.8] flex flex-col min-h-0">
             <div className="bg-emerald-50 text-emerald-950 font-bold text-center py-0.5 text-[11.5px] border-b border-emerald-700/60 tracking-wide shrink-0">
               কার্যপ্রণালী
             </div>
@@ -324,18 +393,18 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
           </div>
 
           {/* 2.2 লক্ষণীয় বিষয় (Quality Points) */}
-          <div className="flex-[1.5] flex flex-col min-h-0">
+          <div className="flex-[1.4] flex flex-col min-h-0">
             <div className="bg-slate-100 font-bold text-center py-0.5 text-[10.5px] border-b border-black shrink-0">
               লক্ষণীয় বিষয়
             </div>
-            <div className="flex-1 p-2 space-y-1 overflow-hidden text-[11px] leading-relaxed">
+            <div className={`flex-1 overflow-hidden ${qualityStyle.container}`}>
               {procedure.qualityPoints.map((point, idx) => (
                 <div
                   key={idx}
                   contentEditable
                   suppressContentEditableWarning
                   onBlur={(e) => onUpdateQuality?.(idx, e.currentTarget.textContent || '')}
-                  className="text-justify text-slate-900 focus:bg-amber-50/80 focus:outline-none rounded px-1 -mx-1"
+                  className={`text-justify text-slate-900 focus:bg-amber-50/80 focus:outline-none rounded px-1 -mx-1 ${qualityStyle.text}`}
                 >
                   {point}
                 </div>
@@ -344,18 +413,18 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
           </div>
 
           {/* 2.3 সাধারণ নির্দেশনা (General Instructions) */}
-          <div className="flex-[1.2] flex flex-col min-h-0">
+          <div className="flex-[1.1] flex flex-col min-h-0">
             <div className="bg-slate-100 font-bold text-center py-0.5 text-[10.5px] border-b border-black shrink-0">
               সাধারণ নির্দেশনা
             </div>
-            <div className="flex-1 p-2 space-y-0.5 overflow-hidden text-[10px] leading-relaxed">
+            <div className={`flex-1 overflow-hidden ${generalStyle.container}`}>
               {procedure.generalInstructions.map((inst, idx) => (
                 <div
                   key={idx}
                   contentEditable
                   suppressContentEditableWarning
                   onBlur={(e) => onUpdateGeneral?.(idx, e.currentTarget.textContent || '')}
-                  className="text-justify text-slate-800 focus:bg-amber-50/80 focus:outline-none rounded px-1 -mx-1"
+                  className={`text-justify text-slate-800 focus:bg-amber-50/80 focus:outline-none rounded px-1 -mx-1 ${generalStyle.text}`}
                 >
                   {inst}
                 </div>
@@ -363,14 +432,14 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
             </div>
           </div>
 
-          {/* 2.4 Safety Instruction (PPE Section) */}
+          {/* 2.4 Safety Instruction (PPE Section - Streamlined compact height) */}
           <div className="shrink-0 flex flex-col">
-            <div className="bg-slate-100 font-bold text-center py-0.5 text-[10px] border-b border-black font-sans">
+            <div className="bg-slate-100 font-bold text-center py-0.5 text-[9.5px] border-b border-black font-sans">
               Safety Instruction
             </div>
-            <div className="p-1.5 flex flex-row items-center gap-2 bg-white">
+            <div className="py-1 px-1.5 flex flex-row items-center gap-2 bg-white">
               {/* Safety text statement (50%) */}
-              <div className="w-1/2 text-[8.5px] leading-tight text-slate-800 text-center font-medium">
+              <div className="w-1/2 text-[8px] leading-tight text-slate-800 text-center font-medium">
                 {safety.instructionText}
               </div>
 
@@ -378,33 +447,33 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
               <div className="w-1/2 flex flex-row justify-around items-end">
                 {/* Ear Muff */}
                 <div className="flex flex-col items-center">
-                  <img src="/ppe/ear-muff.svg" alt="Ear Muff" className="h-6 w-6 object-contain mb-0.5" />
-                  <div className="w-3.5 h-3.5 border border-black flex items-center justify-center bg-white text-[9px]">
-                    {safety.earMuff && <Check className="w-3 h-3 text-black stroke-[3]" />}
+                  <img src="/ppe/ear-muff.svg" alt="Ear Muff" className="h-5 w-5 object-contain mb-0.5" />
+                  <div className="w-3 h-3 border border-black flex items-center justify-center bg-white text-[8px]">
+                    {safety.earMuff && <Check className="w-2.5 h-2.5 text-black stroke-[3]" />}
                   </div>
                 </div>
 
                 {/* Gloves */}
                 <div className="flex flex-col items-center">
-                  <img src="/ppe/gloves.svg" alt="Gloves" className="h-6 w-6 object-contain mb-0.5" />
-                  <div className="w-3.5 h-3.5 border border-black flex items-center justify-center bg-white text-[9px]">
-                    {safety.gloves && <Check className="w-3 h-3 text-black stroke-[3]" />}
+                  <img src="/ppe/gloves.svg" alt="Gloves" className="h-5 w-5 object-contain mb-0.5" />
+                  <div className="w-3 h-3 border border-black flex items-center justify-center bg-white text-[8px]">
+                    {safety.gloves && <Check className="w-2.5 h-2.5 text-black stroke-[3]" />}
                   </div>
                 </div>
 
                 {/* Goggles */}
                 <div className="flex flex-col items-center">
-                  <img src="/ppe/goggles.svg" alt="Goggles" className="h-6 w-6 object-contain mb-0.5" />
-                  <div className="w-3.5 h-3.5 border border-black flex items-center justify-center bg-white text-[9px]">
-                    {safety.goggles && <Check className="w-3 h-3 text-black stroke-[3]" />}
+                  <img src="/ppe/goggles.svg" alt="Goggles" className="h-5 w-5 object-contain mb-0.5" />
+                  <div className="w-3 h-3 border border-black flex items-center justify-center bg-white text-[8px]">
+                    {safety.goggles && <Check className="w-2.5 h-2.5 text-black stroke-[3]" />}
                   </div>
                 </div>
 
                 {/* Safety Shoes */}
                 <div className="flex flex-col items-center">
-                  <img src="/ppe/safety-shoes.svg" alt="Safety Shoes" className="h-6 w-6 object-contain mb-0.5" />
-                  <div className="w-3.5 h-3.5 border border-black flex items-center justify-center bg-white text-[9px]">
-                    {safety.safetyShoes && <Check className="w-3 h-3 text-black stroke-[3]" />}
+                  <img src="/ppe/safety-shoes.svg" alt="Safety Shoes" className="h-5 w-5 object-contain mb-0.5" />
+                  <div className="w-3 h-3 border border-black flex items-center justify-center bg-white text-[8px]">
+                    {safety.safetyShoes && <Check className="w-2.5 h-2.5 text-black stroke-[3]" />}
                   </div>
                 </div>
               </div>
@@ -413,22 +482,22 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
         </div>
       </div>
 
-      {/* 3. BOTTOM TABLES SECTION (PARTS & TOOLS - Pure Flexbox & Tables) */}
+      {/* 3. BOTTOM TABLES SECTION (PARTS & TOOLS - Compact 3-Row Architecture as requested) */}
       <div className="border-t-2 border-black flex flex-row divide-x-2 divide-black text-[9px] w-full shrink-0">
-        {/* Parts Table (50%) */}
+        {/* Parts Table (Strictly 3 Rows Max) */}
         <div className="w-1/2 flex flex-col">
           <table className="w-full border-collapse text-center">
             <thead>
               <tr className="bg-slate-100 border-b border-black font-bold">
-                <th className="w-8 border-r border-black py-0.5">SL. No</th>
-                <th className="border-r border-black py-0.5">Parts Name</th>
-                <th className="w-24 border-r border-black py-0.5">Capacity(BTU)</th>
-                <th className="w-16 py-0.5">Gas</th>
+                <th className="w-8 border-r border-black py-0.5 text-[8.5px]">SL. No</th>
+                <th className="border-r border-black py-0.5 text-[8.5px]">Parts Name</th>
+                <th className="w-24 border-r border-black py-0.5 text-[8.5px]">Capacity(BTU)</th>
+                <th className="w-16 py-0.5 text-[8.5px]">Gas</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/60">
-              {parts.slice(0, 7).map((p, idx) => (
-                <tr key={idx} className="h-[13px] leading-none">
+              {parts.slice(0, 3).map((p, idx) => (
+                <tr key={idx} className="h-[12px] leading-none">
                   <td className="border-r border-black/60 font-bold">{p.sl}</td>
                   <td className="border-r border-black/60 px-1 text-left truncate">{p.name}</td>
                   <td className="border-r border-black/60 px-1">{p.capacity}</td>
@@ -439,22 +508,22 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
           </table>
         </div>
 
-        {/* Tools & Equipments Table (50%) */}
+        {/* Tools & Equipments Table (Strictly 3 Rows Max) */}
         <div className="w-1/2 flex flex-col">
           <table className="w-full border-collapse text-center">
             <thead>
               <tr className="bg-slate-100 border-b border-black font-bold">
-                <th colSpan={3} className="py-0.5 border-b border-black">Tools & Equipments</th>
+                <th colSpan={3} className="py-0.5 border-b border-black text-[8.5px]">Tools & Equipments</th>
               </tr>
               <tr className="bg-slate-50 border-b border-black font-bold">
-                <th className="w-8 border-r border-black py-0.5">SL</th>
-                <th className="border-r border-black py-0.5">Name</th>
-                <th className="w-32 py-0.5">Effective Range</th>
+                <th className="w-8 border-r border-black py-0.5 text-[8.5px]">SL</th>
+                <th className="border-r border-black py-0.5 text-[8.5px]">Name</th>
+                <th className="w-32 py-0.5 text-[8.5px]">Effective Range</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/60">
-              {tools.slice(0, 6).map((t, idx) => (
-                <tr key={idx} className="h-[13px] leading-none">
+              {tools.slice(0, 3).map((t, idx) => (
+                <tr key={idx} className="h-[12px] leading-none">
                   <td className="border-r border-black/60 font-bold">{t.sl}</td>
                   <td className="border-r border-black/60 px-1 text-left truncate">{t.name}</td>
                   <td className="px-1 truncate">{t.effectiveRange}</td>

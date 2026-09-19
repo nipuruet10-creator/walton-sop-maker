@@ -74,4 +74,5 @@ export interface SOPDocument {
   tools: SOPToolRow[];
   imageFit?: 'contain' | 'cover';
   gridCols?: number;
+  stepFontSize?: 'auto' | 'compact' | 'normal' | 'large' | 'xlarge';
 }

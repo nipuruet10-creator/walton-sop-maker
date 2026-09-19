@@ -413,7 +413,7 @@ export async function exportSOPToExcel(data: SOPDocument) {
   });
   applyBorders(1, bottomStart + 1, 4, bottomStart + 1);
 
-  data.parts.forEach((p, idx) => {
+  data.parts.slice(0, 3).forEach((p, idx) => {
     const r = bottomStart + 2 + idx;
     ws.getRow(r).height = 18;
     ws.getCell(`A${r}`).value = p.sl;
@@ -486,7 +486,7 @@ export async function exportSOPToExcel(data: SOPDocument) {
   });
   applyBorders(6, bottomStart + 4, 9, bottomStart + 4);
 
-  data.tools.forEach((t, idx) => {
+  data.tools.slice(0, 3).forEach((t, idx) => {
     const r = bottomStart + 5 + idx;
     ws.getRow(r).height = 18;
     ws.getCell(`F${r}`).value = t.sl;

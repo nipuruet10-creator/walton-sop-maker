@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { SOPProcedure } from '../../types/sop';
 import { toBengaliNumber } from '../../data/defaultSopData';
 import { offlineConvertBanglish } from '../../services/banglishEngine';
-import { Sparkles, Plus, Trash2, HelpCircle, CheckCircle2, Zap, BookmarkCheck, Cpu } from 'lucide-react';
+import { Sparkles, Plus, Trash2, HelpCircle, CheckCircle2, Zap, BookmarkCheck, Cpu, Type } from 'lucide-react';
 
 interface BanglishProcedureEditorProps {
   procedure: SOPProcedure;
@@ -15,6 +15,8 @@ interface BanglishProcedureEditorProps {
   activeProvider?: 'openrouter' | 'gemini';
   activeModel?: string;
   onOpenAiModal?: () => void;
+  stepFontSize?: 'auto' | 'compact' | 'normal' | 'large' | 'xlarge';
+  onFontSizeChange?: (size: 'auto' | 'compact' | 'normal' | 'large' | 'xlarge') => void;
 }
 
 const PRESET_TEMPLATES = [
@@ -47,6 +49,8 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
   activeProvider = 'openrouter',
   activeModel = 'openrouter/free',
   onOpenAiModal,
+  stepFontSize = 'auto',
+  onFontSizeChange,
 }) => {
   const [autoConvert, setAutoConvert] = useState<boolean>(false);
   const debounceTimerRef = useRef<any>(null);
@@ -232,6 +236,38 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
             <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin text-amber-300' : 'text-amber-300'}`} />
             <span>{isGenerating ? 'AI অনুবাদ ও পরিমার্জন হচ্ছে...' : 'AI Generate (100% Bengali)'}</span>
           </button>
+        </div>
+      </div>
+
+      {/* Font Size Adjuster for Procedure Steps */}
+      <div className="bg-slate-100/90 p-2 rounded-lg border border-slate-200 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+        <div className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold">
+          <Type className="w-3.5 h-3.5 text-blue-600" />
+          <span>টেক্সট ফন্ট সাইজ (Font Size):</span>
+        </div>
+        <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-slate-200 text-[11px]">
+          {(
+            [
+              { key: 'auto', label: 'Auto (স্বয়ংক্রিয়)' },
+              { key: 'compact', label: 'ছোট' },
+              { key: 'normal', label: 'স্বাভাবিক' },
+              { key: 'large', label: 'বড়' },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              onClick={() => onFontSizeChange?.(opt.key)}
+              className={`px-2 py-0.5 rounded text-[10.5px] font-medium transition cursor-pointer ${
+                stepFontSize === opt.key
+                  ? 'bg-blue-600 text-white font-bold shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title={`SOP পেপারের টেক্সট সাইজ ${opt.label} করুন`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
       </div>
 
