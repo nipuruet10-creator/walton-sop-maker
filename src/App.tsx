@@ -360,7 +360,21 @@ export const App: React.FC = () => {
         });
       } catch {}
     } catch (err: any) {
-      alert('Procedure generation failed: ' + (err.message || 'Unknown error'));
+      console.warn('Procedure generation encountered error, falling back to offline engine:', err);
+      const fallback = offlineConvertBanglish(input);
+      setData((prev) => ({
+        ...prev,
+        procedure: {
+          ...prev.procedure,
+          steps: fallback.steps.length > 0 ? fallback.steps : prev.procedure.steps,
+          qualityPoints:
+            fallback.qualityPoints.length > 0 ? fallback.qualityPoints : prev.procedure.qualityPoints,
+          generalInstructions:
+            fallback.generalInstructions.length > 0
+              ? fallback.generalInstructions
+              : prev.procedure.generalInstructions,
+        },
+      }));
     } finally {
       setIsGenerating(false);
     }
@@ -405,7 +419,17 @@ export const App: React.FC = () => {
         } catch {}
       }
     } catch (err: any) {
-      alert('Quality points generation failed: ' + (err.message || 'Unknown error'));
+      console.warn('Quality points encountered error, falling back to offline engine:', err);
+      const fallbackPoints = offlineConvertQualityPoints(input);
+      if (fallbackPoints.length > 0) {
+        setData((prev) => ({
+          ...prev,
+          procedure: {
+            ...prev.procedure,
+            qualityPoints: fallbackPoints,
+          },
+        }));
+      }
     } finally {
       setIsGeneratingQuality(false);
     }

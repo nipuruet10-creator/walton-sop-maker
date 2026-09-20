@@ -13,7 +13,18 @@ const phraseDictionary: [RegExp, string | ReplacementFn][] = [
   // Photo reference patterns
   [/\(?\b(?:chobi|pic|photo|figure|chitra|citro|ছবি)[-_\s]*([0-9]+)\b\)?/gi, (_: string, n: string) => `(চিত্র-${toBengaliNumber(parseInt(n, 10))})`],
 
-  // Equipment & Industrial objects
+  // Equipment, Factory Terms & Industrial objects
+  [/\b(?:smart\s*qr\s*code\s*sticker|smart\s*qr\s*sticker)\b/gi, 'Smart QR Code Sticker'],
+  [/\b(?:smart\s*qr\s*code|smart\s*qr)\b/gi, 'Smart QR Code'],
+  [/\b(?:qr\s*code\s*sticker|qr\s*sticker)\b/gi, 'QR Code Sticker'],
+  [/\b(?:qr\s*code)\b/gi, 'QR Code'],
+  [/\b(?:product\s*barcode\s*sticker|barcode\s*sticker)\b/gi, 'Barcode Sticker'],
+  [/\b(?:product\s*barcode)\b/gi, 'Product Barcode'],
+  [/\b(?:barcode)\b/gi, 'Barcode'],
+  [/\b(?:indoor\s*unit)\b/gi, 'Indoor Unit'],
+  [/\b(?:outdoor\s*unit)\b/gi, 'Outdoor Unit'],
+  [/\b(?:e-service|eservice)\b/gi, 'E-Service'],
+  [/\b(?:wqms)\b/gi, 'WQMS'],
   [/\b(?:packaging tape dispenser|packaging tape)\b/gi, 'প্যাকেজিং টেপ ডিসপেনসার'],
   [/\b(?:tape dispenser|dispenser)\b/gi, 'টেপ ডিসপেনসার'],
   [/\b(?:bopp tape)\b/gi, 'BOPP টেপ'],
@@ -32,7 +43,15 @@ const phraseDictionary: [RegExp, string | ReplacementFn][] = [
   [/\b(?:magnetic seal)\b/gi, 'ম্যাগনেটিক সিল'],
   [/\b(?:four corner|char corner)\b/gi, 'চার কোণা'],
   [/\b(?:uniform gap)\b/gi, 'সুষম ফাঁকা স্থান'],
+  [/\b(?:code\s*sender\s*process|code\s*sender)\b/gi, 'Code Sender Process'],
+  [/\b(?:set\s*up|setup)\b/gi, 'Set Up'],
   [/\b(?:close kore|bondho kore)\b/gi, 'বন্ধ করে'],
+  [/\b(?:soriye\s*dite\s*hobe|soriye\s*nite\s*hobe|remove\s*korte\s*hobe)\b/gi, 'সরিয়ে নিতে হবে'],
+  [/\b(?:soriye\s*deya|soriye\s*dibo)\b/gi, 'সরিয়ে দিতে'],
+  [/\b(?:probesh\s*kore|enter\s*kore)\b/gi, 'প্রবেশ করে'],
+  [/\b(?:sahajjye|sahajje|help\s*e)\b/gi, 'সাহায্যে'],
+  [/\b(?:nirdharito|fixed)\b/gi, 'নির্ধারিত'],
+  [/\b(?:proyojyo|applicable)\b/gi, 'প্রযোজ্য'],
   [/\b(?:ase kina|ache kina)\b/gi, 'আছে কিনা'],
 
   // Multi-word action phrases & adverbs (with flexible whitespace and phonetic typo handling)
@@ -305,6 +324,28 @@ const wordMap: Record<string, string> = {
   cartoone: 'কার্টুনে',
   kartune: 'কার্টুনে',
   dispenser: 'ডিসপেনসার',
+  forma: 'Forma',
+  poly: 'Poly',
+  frame: 'Frame',
+  model: 'Model',
+  scanner: 'Scanner',
+  scan: 'স্ক্যান',
+  barcode: 'Barcode',
+  qr: 'QR',
+  code: 'Code',
+  setup: 'Set Up',
+  idu: 'IDU',
+  odu: 'ODU',
+  cac: 'CAC',
+  pcb: 'PCB',
+  jig: 'Jig',
+  sticker: 'Sticker',
+  soriye: 'সরিয়ে',
+  probesh: 'প্রবেশ',
+  sahajjye: 'সাহায্যে',
+  sahajje: 'সাহায্যে',
+  nirdharito: 'নির্ধারিত',
+  proyojyo: 'প্রযোজ্য',
 
   // Connectors & Adverbs
   er: 'এর',
@@ -372,6 +413,34 @@ const wordMap: Record<string, string> = {
   kg: 'কেজি',
 };
 
+// Preserved industrial terms that should never be phonetically mangled
+const PRESERVED_INDUSTRIAL_TERMS: Record<string, string> = {
+  qr: 'QR',
+  code: 'Code',
+  barcode: 'Barcode',
+  indoor: 'Indoor',
+  unit: 'Unit',
+  outdoor: 'Outdoor',
+  poly: 'Poly',
+  forma: 'Forma',
+  frame: 'Frame',
+  model: 'Model',
+  setup: 'Set Up',
+  scanner: 'Scanner',
+  scan: 'স্ক্যান',
+  eservice: 'E-Service',
+  'e-service': 'E-Service',
+  wqms: 'WQMS',
+  bopp: 'BOPP',
+  pet: 'PET',
+  pcb: 'PCB',
+  jig: 'Jig',
+  sticker: 'Sticker',
+  dispenser: 'ডিসপেনসার',
+  smart: 'Smart',
+  process: 'Process',
+};
+
 // 3. Fallback Phonetic Transliteration (Avro-like phonetic algorithm)
 function phoneticWord(w: string): string {
   // If acronym (all caps like BOPP, IDU, CAC, PET, BTU, SL) or digits, keep as-is
@@ -380,6 +449,10 @@ function phoneticWord(w: string): string {
   }
 
   const str = w.toLowerCase();
+
+  if (PRESERVED_INDUSTRIAL_TERMS[str]) {
+    return PRESERVED_INDUSTRIAL_TERMS[str];
+  }
 
   // Basic Avro phonetic replacement rules
   const phoneticMap: [RegExp, string][] = [
@@ -462,6 +535,89 @@ function cleanBanglaFormatting(text: string): string {
 
   // If sentence starts with "(চিত্র-X) অনুযায়ী" or "(চিত্র-X) অনুসারে", change to "চিত্র-X অনুযায়ী" without parenthesis
   res = res.replace(/^[\s\(]*(চিত্র-[০-৯]+)\)?\s*(এ\s+দেখানো\s+অনুযায়ী|অনুযায়ী|অনুসারে|মতে)/gi, '$1 $2');
+
+  // Auto-sanitizer for AI over-translations of factory technical terms:
+  res = res
+    // Multi-word specific phrases first
+    .replace(/স্মার্ট\s*কোডেড\s*প্রতীক\s*স্টিকারটি/gi, 'Smart QR Code Sticker-টি')
+    .replace(/স্মার্ট\s*কোডেড\s*প্রতীক\s*স্টিকার/gi, 'Smart QR Code Sticker')
+    .replace(/কোডেড\s*প্রতীক\s*স্টিকারটি/gi, 'QR Code Sticker-টি')
+    .replace(/কোডেড\s*প্রতীক\s*স্টিকার(?:ের)?/gi, 'QR Code Sticker-এর')
+    .replace(/কোডেড\s*প্রতীক\s*স্টিকার/gi, 'QR Code Sticker')
+    .replace(/পণ্য\s*বারকোড\s*স্টিকার/gi, 'Product Barcode Sticker')
+    .replace(/উপাদান\s*বারকোড\s*স্টিকার/gi, 'Component Barcode Sticker')
+
+    // Scanner terms
+    .replace(/স্মার্ট\s*কোড\s*স্ক্যানিং\s*যন্ত্র(?:ের)?/gi, 'Smart QR Code Scanner-এর')
+    .replace(/স্মার্ট\s*কোড\s*স্ক্যানিং\s*যন্ত্রটি/gi, 'Smart QR Code Scanner-টি')
+    .replace(/স্মার্ট\s*কোড\s*স্ক্যানিং\s*যন্ত্রে/gi, 'Smart QR Code Scanner-এ')
+    .replace(/স্মার্ট\s*কোড\s*স্ক্যানিং\s*যন্ত্র/gi, 'Smart QR Code Scanner')
+
+    // Process terms
+    .replace(/স্মার্ট\s*কোড\s*প্রেরক\s*প্রক্রিয়া|স্মার্ট\s*কোড\s*প্রেরক\s*প্রক্রিয়া/gi, 'Smart QR Code Sender Process')
+    .replace(/কোড\s*প্রেরক\s*প্রক্রিয়া|কোড\s*প্রেরক\s*প্রক্রিয়া/gi, 'Code Sender Process')
+
+    // Smart QR terms
+    .replace(/স্মার্ট\s*কোডেড\s*প্রতীকটি/gi, 'Smart QR Code-টি')
+    .replace(/স্মার্ট\s*কোডেড\s*প্রতীকের/gi, 'Smart QR Code-এর')
+    .replace(/স্মার্ট\s*কোডেড\s*প্রতীকে/gi, 'Smart QR Code-এ')
+    .replace(/স্মার্ট\s*কোডেড\s*প্রতীক/gi, 'Smart QR Code')
+    .replace(/স্মার্ট\s*কোডের/gi, 'Smart QR Code-এর')
+    .replace(/স্মার্ট\s*কোড(?:টি)?/gi, 'Smart QR Code')
+
+    // Standard QR terms
+    .replace(/কোডেড\s*প্রতীকটি/gi, 'QR Code-টি')
+    .replace(/কোডেড\s*প্রতীকের/gi, 'QR Code-এর')
+    .replace(/কোডেড\s*প্রতীকে/gi, 'QR Code-এ')
+    .replace(/কোডেড\s*প্রতীক/gi, 'QR Code')
+
+    // Barcode terms
+    .replace(/পণ্য\s*বারকোডের/gi, 'Product Barcode-এর')
+    .replace(/পণ্য\s*বারকোড(?:টি)?/gi, 'Product Barcode')
+    .replace(/উপাদান\s*বারকোডের/gi, 'Component Barcode-এর')
+    .replace(/উপাদান\s*বারকোড(?:টি)?/gi, 'Component Barcode')
+
+    // Indoor / Outdoor Units
+    .replace(/এসি-এর\s*অভ্যন্তভাগের\s*এককের/gi, 'AC Indoor Unit-এর')
+    .replace(/এসি-এর\s*অভ্যন্তভাগের\s*এককে/gi, 'AC Indoor Unit-এ')
+    .replace(/এসি-এর\s*অভ্যন্তভাগের\s*এককটি/gi, 'AC Indoor Unit-টি')
+    .replace(/এসি-এর\s*অভ্যন্তভাগের\s*একক/gi, 'AC Indoor Unit')
+    .replace(/অভ্যন্তভাগের\s*এককের/gi, 'Indoor Unit-এর')
+    .replace(/অভ্যন্তভাগের\s*এককে/gi, 'Indoor Unit-এ')
+    .replace(/অভ্যন্তভাগের\s*এককটি/gi, 'Indoor Unit-টি')
+    .replace(/অভ্যন্তভাগের\s*একক/gi, 'Indoor Unit')
+    .replace(/বহির্ভাগের\s*এককের/gi, 'Outdoor Unit-এর')
+    .replace(/বহির্ভাগের\s*এককে/gi, 'Outdoor Unit-এ')
+    .replace(/বহির্ভাগের\s*এককটি/gi, 'Outdoor Unit-টি')
+    .replace(/বহির্ভাগের\s*একক/gi, 'Outdoor Unit')
+
+    // E-Service
+    .replace(/বৈদ্যুতিক\s*সেবা\s*প্রণালীতে/gi, 'E-Service-এ')
+    .replace(/বৈদ্যুতিক\s*সেবা\s*প্রণালী\s*থেকে/gi, 'E-Service থেকে')
+    .replace(/বৈদ্যুতিক\s*সেবা\s*প্রণালী/gi, 'E-Service')
+
+    // Poly
+    .replace(/পলি\s*আবরণটি/gi, 'Poly-টি')
+    .replace(/পলি\s*আবরণের/gi, 'Poly-র')
+    .replace(/পলি\s*আবরণে/gi, 'Poly-তে')
+    .replace(/পলি\s*আবরণ/gi, 'Poly')
+
+    // Scanner
+    .replace(/স্ক্যানিং\s*যন্ত্রের/gi, 'Scanner-এর')
+    .replace(/স্ক্যানিং\s*যন্ত্রটি/gi, 'Scanner-টি')
+    .replace(/স্ক্যানিং\s*যন্ত্রে/gi, 'Scanner-এ')
+    .replace(/স্ক্যানিং\s*যন্ত্র/gi, 'Scanner')
+
+    // Forma (Jig / Fixture)
+    .replace(/মডেলভেদে\s*নির্ধারিত\s*ফর্ম\s*ব্যবহারের\s*মাধ্যমে/gi, 'Model অনুযায়ী নির্ধারিত Forma-র সাহায্যে')
+    .replace(/নির্ধারিত\s*ফর্ম\s*ব্যবহারের\s*মাধ্যমে/gi, 'নির্ধারিত Forma-র সাহায্যে')
+    .replace(/নির্ধারিত\s*ফর্ম/gi, 'নির্ধারিত Forma')
+    .replace(/ফর্ম\s*ব্যবহারের\s*মাধ্যমে/gi, 'Forma-র সাহায্যে')
+    .replace(/ফর্মের\s*সাহায্যে/gi, 'Forma-র সাহায্যে')
+    .replace(/ফর্মের/gi, 'Forma-র')
+
+    // Format English technical words followed by Bengali suffixes nicely: "Indoor Unit এর" -> "Indoor Unit-এর"
+    .replace(/([A-Za-z0-9])\s+(এর|র|এ|তে|টি|টা|গুলো)(?=[\s.,!?।]|$)/g, '$1-$2');
 
   // Bengali genitive contractions: 'কার্টুন এর' -> 'কার্টুনের', 'টেপ এর' -> 'টেপের', 'মেশিন এর' -> 'মেশিনের'
   res = res.replace(/([\u0995-\u09B9])\s+এর(?=[\s.,!?।]|$)/g, '$1ের');
@@ -600,7 +756,7 @@ export function offlineConvertBanglish(input: string): GeneratedSOPContent {
 }
 
 /**
- * Google Gemini AI Generation for Banglish -> 100% Pure Bengali SOP
+ * Google Gemini AI Generation for Banglish -> High-Quality Bengali SOP
  */
 export async function generateSOPWithGemini(
   banglishInput: string,
@@ -608,19 +764,40 @@ export async function generateSOPWithGemini(
   numPhotos: number = 6
 ): Promise<GeneratedSOPContent> {
   const prompt = `You are a Senior Industrial Process Development Engineer at Walton Hi-Tech Industries PLC.
-You create official, professional Standard Operating Procedure (SOP) documents in PURE, FLAWLESS MANUFACTURING BENGALI (সম্পূর্ণ শুদ্ধ প্রমিত বাংলা).
+You create official, professional Standard Operating Procedure (SOP) documents in HIGH-QUALITY MANUFACTURING BENGALI (উচ্চমানের প্রমিত কারখানা বাংলা).
 The user provides rough procedure steps in Banglish or English.
 There are ${numPhotos} attached photos numbered from চিত্র-১ to চিত্র-${toBengaliNumber(numPhotos)}.
 
-CRITICAL LANGUAGE RULES:
-1. Output MUST BE 100% PURE FORMAL BENGALI (সম্পূর্ণ প্রমিত বাংলা).
-2. DO NOT leave ANY English words, Banglish words, or English particles (e.g., NEVER output 'er', 'e', 'te', 'ti', 'dite hobe', 'valo vabe', 'korte hobe', 'every', 'kartun', 'sothik vabe', 'lagay nite hobe').
-3. Translate all technical terms naturally into Bengali (e.g. 'প্যাকেজিং টেপ ডিসপেনসার', 'কার্টুনের চিহ্নিত স্থানে', 'ভালোভাবে বসাতে হবে', 'BOPP টেপ', 'পেট বেল্ট মেশিন', 'সঠিকভাবে লাগিয়ে নিতে হবে').
-4. Every step must start with Bengali numbering: ১), ২), ৩), etc.
-5. If referring to a photo at the beginning of a step, write 'চিত্র-৩ অনুযায়ী' or 'চিত্র-৪ এ দেখানো অনুযায়ী,'.
-6. If referring to a photo at the end of a step, write in single parentheses followed by danda: '...বসাতে হবে (চিত্র-১)।'. NEVER output double parentheses like '((চিত্র-১))' and NEVER output double dandas like '।।'.
-7. Generate 2 to 4 crucial quality inspection points ('লক্ষণীয় বিষয়') numbered ১), ২), etc.
-8. Generate 2 to 3 standard industrial general instructions ('সাধারণ নির্দেশনা') regarding 5S, electricity savings, and line supervisor communication.
+CRITICAL LANGUAGE & TERMINOLOGY GUIDELINES:
+1. FLUENT MANUFACTURING BENGALI GRAMMAR:
+   All verbs, sentence structures, instructions, and connectives MUST be in fluent, grammatically correct formal Bengali (e.g., 'নিতে হবে', 'সরিয়ে দিতে হবে', 'সঠিকভাবে স্থাপন করতে হবে', 'যাচাই করে দেখতে হবে', 'প্রবেশ করে সেটআপ নিশ্চিত করতে হবে', 'সতর্কতার সাথে হ্যান্ডেল করতে হবে')।
+2. PRESERVE FACTORY TECHNICAL TERMS & HARDWARE IN ENGLISH:
+   In Walton manufacturing plants (AC, Refrigerator, TV, Home Appliances, Electronics), all standard technical terms, machine names, software systems, parts, and sticker specifications MUST BE KEPT IN ENGLISH or standard factory Bengali:
+   - PRESERVE IN CLEAN ENGLISH:
+     • QR Code / Barcode (e.g., 'QR Code Sticker', 'Product Barcode', 'Smart QR Code', 'Smart QR')
+     • Indoor Unit / Outdoor Unit (e.g., 'Indoor Unit-এর Frame', 'Outdoor Unit')
+     • E-Service / WQMS (e.g., 'E-Service থেকে WQMS-এ প্রবেশ করে')
+     • Poly / Forma / Frame / Model (e.g., 'Poly-টি সরিয়ে', 'Forma-র সাহায্যে', 'Indoor Unit-এর Frame')
+     • Set Up / Scanner / Scan / Jig / Display / PCB / Sensor / Motor
+     • Standard industrial acronyms: BOPP, PET, IDU, CAC, BTU, SL, WQMS, QR, AC
+   - STRICTLY PROHIBITED OVER-TRANSLATIONS (NEVER USE THESE ARCHAIC TRANSLATIONS):
+     ❌ DO NOT translate 'QR Code' or 'Smart QR' to 'কোডেড প্রতীক' or 'স্মার্ট কোডেড প্রতীক'! (Always keep as 'QR Code' / 'Smart QR Code').
+     ❌ DO NOT translate 'Indoor Unit' to 'অভ্যন্তভাগের একক'! (Keep as 'Indoor Unit' or 'ইনডোর ইউনিট').
+     ❌ DO NOT translate 'Outdoor Unit' to 'বহির্ভাগের একক'! (Keep as 'Outdoor Unit' or 'আউটডোর ইউনিট').
+     ❌ DO NOT translate 'E-Service' to 'বৈদ্যুতিক সেবা প্রণালী'! (Keep as 'E-Service').
+     ❌ DO NOT translate 'Poly' to 'পলি আবরণ'! (Keep as 'Poly' or 'পলি').
+     ❌ DO NOT translate 'Forma' to 'ফর্ম'! (Keep as 'Forma' or 'ফরমা').
+     ❌ DO NOT translate 'Scanner' to 'স্ক্যানিং যন্ত্র'! (Keep as 'Scanner' or 'স্ক্যানার').
+3. CLEAN SUFFIXES FOR ENGLISH TERMS:
+   When attaching Bengali case endings to English words, format them cleanly: 'QR Code Sticker-টি', 'Indoor Unit-এর Frame থেকে', 'Poly-টি সরিয়ে', 'Forma-র সাহায্যে', 'WQMS-এ প্রবেশ করে', 'Product Barcode ও QR Code Sticker সঠিকভাবে লাগিয়ে দিতে হবে'।
+4. NO BANGLISH CASUAL WORDS OR SLANG:
+   Do NOT output raw Banglish verbs or conversational particles (e.g., DO NOT output 'dite hobe', 'valo vabe', 'korte hobe', 'sothik vabe', 'lagay nite hobe', 'eta', 'nissit').
+5. Every step must start with Bengali numbering: ১), ২), ৩), etc.
+6. If referring to a photo at the beginning of a step, write 'চিত্র-৩ অনুযায়ী' or 'চিত্র-৪ এ দেখানো অনুযায়ী,'.
+7. If referring to a photo at the end of a step, write in single parentheses followed by danda: '...বসাতে হবে (চিত্র-১)।' or '...(চিত্র-১ ও চিত্র-২)।'. NEVER output double parentheses like '((চিত্র-১))' and NEVER output double dandas like '।।'.
+8. ZERO INFORMATION LOSS: Translate EVERY sentence and clause provided in each step!
+9. Generate 2 to 4 crucial quality inspection points ('লক্ষণীয় বিষয়') numbered ১), ২), etc.
+10. Generate 2 to 3 standard industrial general instructions ('সাধারণ নির্দেশনা') regarding 5S, electricity savings, and line supervisor communication.
 
 User Banglish Input:
 """
@@ -630,17 +807,16 @@ ${banglishInput}
 You MUST reply ONLY with valid JSON in this exact structure without markdown formatting or codeblocks:
 {
   "steps": [
-    "১) প্রথমে প্যাকেজিং টেপ ডিসপেনসার থেকে ২০০ মিলিমিটার লম্বা BOPP টেপ কেটে নিতে হবে এবং সঠিকভাবে লাগিয়ে নিতে হবে।",
-    "২) ক্যাসেট ইনডোর কার্টুনের চিহ্নিত স্থানে সঠিকভাবে টেপটি বসাতে হবে (চিত্র-১)।",
-    "৩) ইনডোর কার্টুনের প্রতিটি টেপিং স্থানে এক লেয়ার BOPP টেপ ব্যবহার করতে হবে (চিত্র-২)।",
-    "৪) চিত্র-৩ অনুযায়ী ক্যাসেট ইনডোর কার্টুনের নিচের দিকে BOPP টেপ ব্যবহার করতে হবে।",
-    "৫) চিত্র-৪ এ দেখানো অনুযায়ী, কার্টুনের উভয় পাশে ৪টি করে মোট ৮টি নির্দিষ্ট স্থানে BOPP টেপ ব্যবহার করতে হবে।",
-    "৬) চিত্র-৫ অনুসারে পেট বেল্ট মেশিনে ৩ সেটিং করে কার্টুনে সঠিকভাবে বেল্ট দিতে হবে।"
+    "১) প্রথমে নির্ধারিত Model-এর জন্য প্রযোজ্য QR Code Sticker নিতে হবে। এরপর Indoor Unit-এর Frame থেকে Poly-টি সরিয়ে নিতে হবে (চিত্র-১)।",
+    "২) Model অনুযায়ী নির্ধারিত Forma নিতে হবে এবং Forma-র সাহায্যে নির্দিষ্ট স্থানে Product Barcode ও QR Code Sticker সঠিকভাবে লাগিয়ে দিতে হবে (চিত্র-১ ও চিত্র-২)।",
+    "৩) এরপর E-Service থেকে WQMS-এ প্রবেশ করে Set Up (Smart QR Code Sender Process) সম্পন্ন করতে হবে (চিত্র-৩)।",
+    "৪) চিত্র-৪ অনুযায়ী প্যাকেজিং টেপ ডিসপেনসার থেকে ২০০ মিলিমিটার লম্বা BOPP টেপ কেটে কার্টুনে ১ লেয়ার টেপ ব্যবহার করতে হবে।",
+    "৫) চিত্র-৫ অনুসারে পেট বেল্ট মেশিনে ৩ সেটিং করে কার্টুনে সঠিকভাবে বেল্ট দিতে হবে।"
   ],
   "qualityPoints": [
-    "১) বেল্ট লাগানোর সময় নিশ্চিত করতে হবে যাতে কার্টুন ছিঁড়ে না যায়। (চিত্র-৬)",
-    "২) টেপ বসানোর সময় খেয়াল রাখতে হবে, যাতে টেপ বাঁকা না হয় এবং সোজাসুজি থাকে।",
-    "৩) প্রতিটি জায়গায় এক লেয়ার টেপ সঠিকভাবে দেওয়া হয়েছে কিনা তা যাচাই করতে হবে।"
+    "১) QR Code Sticker এবং Product Barcode যাতে নির্দিষ্ট স্থানে সোজাভাবে এবং কোনো ভাঁজ বা এয়ার বাবল ছাড়া লাগানো থাকে তা নিশ্চিত করতে হবে (চিত্র-১ ও চিত্র-২)।",
+    "২) Frame থেকে Poly সরানোর সময় কোনো স্ক্র্যাচ বা দাগ যাতে না পড়ে সেদিকে খেয়াল রাখতে হবে।",
+    "৩) WQMS এবং E-Service-এ ডাটা সঠিকভাবে সেটআপ হয়েছে কিনা তা যাচাই করতে হবে।"
   ],
   "generalInstructions": [
     "১) সকল প্রয়োজনীয় যন্ত্রপাতি সঠিক স্থানে রাখতে হবে।",
