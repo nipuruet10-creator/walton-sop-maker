@@ -6,6 +6,7 @@ import {
   Circle,
   PenTool,
   Type,
+  Crop,
   Undo2,
   Redo2,
   Trash2,
@@ -21,9 +22,10 @@ interface PhotoAnnotatorModalProps {
   imageUrl: string;
   photoLabel: string;
   onSave: (annotatedBase64: string) => void;
+  initialTool?: ToolType;
 }
 
-type ToolType = 'box' | 'arrow' | 'circle' | 'pen' | 'text';
+export type ToolType = 'box' | 'arrow' | 'circle' | 'pen' | 'text' | 'crop';
 
 interface AnnotationAction {
   tool: ToolType;
@@ -54,19 +56,36 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
   imageUrl,
   photoLabel,
   onSave,
+  initialTool = 'box',
 }) => {
-  const [selectedTool, setSelectedTool] = useState<ToolType>('box');
+  const [selectedTool, setSelectedTool] = useState<ToolType>(initialTool);
   const [currentColor, setCurrentColor] = useState<string>('#dc2626');
   const [currentWidth, setCurrentWidth] = useState<number>(4);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [currentPoints, setCurrentPoints] = useState<{ x: number; y: number }[]>([]);
   const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null);
 
+  // Crop Region state
+  const [cropSelection, setCropSelection] = useState<{
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+  } | null>(null);
+  const [imageUndoStack, setImageUndoStack] = useState<string[]>([]);
+
   const [history, setHistory] = useState<AnnotationAction[]>([]);
   const [redoList, setRedoList] = useState<AnnotationAction[]>([]);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
+
+  // Set initial tool if passed
+  useEffect(() => {
+    if (initialTool) {
+      setSelectedTool(initialTool);
+    }
+  }, [initialTool, isOpen]);
 
   // Load image onto canvas when modal opens
   useEffect(() => {
@@ -79,14 +98,17 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
       imageRef.current = img;
       setHistory([]);
       setRedoList([]);
+      setCropSelection(null);
+      setImageUndoStack([]);
       redrawCanvas([]);
     };
   }, [isOpen, imageUrl]);
 
-  // Redraw canvas with all completed annotations plus optional active drawing
+  // Redraw canvas with all completed annotations plus optional active drawing or crop selection
   const redrawCanvas = (
     currentHistory: AnnotationAction[],
-    activeDrawing?: AnnotationAction | null
+    activeDrawing?: AnnotationAction | null,
+    activeCrop?: { startX: number; startY: number; endX: number; endY: number } | null
   ) => {
     const canvas = canvasRef.current;
     const img = imageRef.current;
@@ -155,6 +177,77 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
 
       ctx.restore();
     });
+
+    // Draw active Crop Overlay if in crop mode or cropSelection exists
+    const crop = activeCrop !== undefined ? activeCrop : cropSelection;
+    if (crop) {
+      const x = Math.min(crop.startX, crop.endX);
+      const y = Math.min(crop.startY, crop.endY);
+      const w = Math.abs(crop.endX - crop.startX);
+      const h = Math.abs(crop.endY - crop.startY);
+
+      if (w > 3 && h > 3) {
+        ctx.save();
+        // Dim region outside the crop rectangle
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.fillRect(0, 0, canvas.width, y);
+        ctx.fillRect(0, y + h, canvas.width, canvas.height - (y + h));
+        ctx.fillRect(0, y, x, h);
+        ctx.fillRect(x + w, y, canvas.width - (x + w), h);
+
+        // Dashed border around crop region
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        ctx.strokeRect(x, y, w, h);
+
+        // Rule of thirds subtle lines
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x + w / 3, y);
+        ctx.lineTo(x + w / 3, y + h);
+        ctx.moveTo(x + (2 * w) / 3, y);
+        ctx.lineTo(x + (2 * w) / 3, y + h);
+        ctx.moveTo(x, y + h / 3);
+        ctx.lineTo(x + w, y + h / 3);
+        ctx.moveTo(x, y + (2 * h) / 3);
+        ctx.lineTo(x + w, y + (2 * h) / 3);
+        ctx.stroke();
+
+        // High-contrast corner brackets
+        ctx.setLineDash([]);
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 3;
+        const cLen = Math.min(20, w / 4, h / 4);
+        ctx.beginPath();
+        // Top-left
+        ctx.moveTo(x, y + cLen); ctx.lineTo(x, y); ctx.lineTo(x + cLen, y);
+        // Top-right
+        ctx.moveTo(x + w - cLen, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + cLen);
+        // Bottom-left
+        ctx.moveTo(x, y + h - cLen); ctx.lineTo(x, y + h); ctx.lineTo(x + cLen, y + h);
+        // Bottom-right
+        ctx.moveTo(x + w - cLen, y + h); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y + h - cLen);
+        ctx.stroke();
+
+        // Size badge
+        const sizeText = `${Math.round(w)} × ${Math.round(h)} px`;
+        ctx.font = 'bold 12px sans-serif';
+        const txtMetrics = ctx.measureText(sizeText);
+        const badgeW = txtMetrics.width + 16;
+        const badgeH = 22;
+        const badgeX = x + Math.max(8, (w - badgeW) / 2);
+        const badgeY = Math.max(8, y + 8);
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+        ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+        ctx.fillStyle = '#fde047';
+        ctx.fillText(sizeText, badgeX + 8, badgeY + 15);
+
+        ctx.restore();
+      }
+    }
   };
 
   // Helper to draw clean directional arrows
@@ -202,6 +295,13 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
     setIsDrawing(true);
     setStartPos(coords);
 
+    if (selectedTool === 'crop') {
+      const initCrop = { startX: coords.x, startY: coords.y, endX: coords.x, endY: coords.y };
+      setCropSelection(initCrop);
+      redrawCanvas(history, null, initCrop);
+      return;
+    }
+
     if (selectedTool === 'pen') {
       setCurrentPoints([coords]);
     } else if (selectedTool === 'text') {
@@ -229,6 +329,13 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !startPos) return;
     const coords = getCanvasCoords(e);
+
+    if (selectedTool === 'crop') {
+      const activeCrop = { startX: startPos.x, startY: startPos.y, endX: coords.x, endY: coords.y };
+      setCropSelection(activeCrop);
+      redrawCanvas(history, null, activeCrop);
+      return;
+    }
 
     if (selectedTool === 'pen') {
       const updatedPts = [...currentPoints, coords];
@@ -262,6 +369,19 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
     if (!isDrawing || !startPos) return;
     const coords = getCanvasCoords(e);
     setIsDrawing(false);
+
+    if (selectedTool === 'crop') {
+      const finalCrop = { startX: startPos.x, startY: startPos.y, endX: coords.x, endY: coords.y };
+      if (Math.abs(finalCrop.endX - finalCrop.startX) > 10 && Math.abs(finalCrop.endY - finalCrop.startY) > 10) {
+        setCropSelection(finalCrop);
+        redrawCanvas(history, null, finalCrop);
+      } else {
+        setCropSelection(null);
+        redrawCanvas(history, null, null);
+      }
+      setStartPos(null);
+      return;
+    }
 
     let finalAction: AnnotationAction | null = null;
     if (selectedTool === 'pen' && currentPoints.length > 1) {
@@ -303,13 +423,92 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
     setStartPos(null);
   };
 
+  // Apply Crop and resize canvas
+  const handleApplyCrop = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !cropSelection) return;
+
+    const x = Math.max(0, Math.min(cropSelection.startX, cropSelection.endX));
+    const y = Math.max(0, Math.min(cropSelection.startY, cropSelection.endY));
+    const w = Math.min(canvas.width - x, Math.abs(cropSelection.endX - cropSelection.startX));
+    const h = Math.min(canvas.height - y, Math.abs(cropSelection.endY - cropSelection.startY));
+
+    if (w < 15 || h < 15) {
+      alert('ক্রপ করার জন্য অনুগ্রহ করে একটু বড় এরিয়া নির্বাচন করুন।');
+      return;
+    }
+
+    // Capture clean image before crop to support Undo
+    redrawCanvas(history, null, null);
+    const prevBase64 = canvas.toDataURL('image/jpeg', 0.95);
+    setImageUndoStack((prev) => [...prev, prevBase64]);
+
+    // Create offscreen canvas for cropped portion
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = Math.round(w);
+    cropCanvas.height = Math.round(h);
+    const cropCtx = cropCanvas.getContext('2d');
+    if (!cropCtx) return;
+
+    cropCtx.drawImage(
+      canvas,
+      Math.round(x),
+      Math.round(y),
+      Math.round(w),
+      Math.round(h),
+      0,
+      0,
+      Math.round(w),
+      Math.round(h)
+    );
+
+    const croppedBase64 = cropCanvas.toDataURL('image/jpeg', 0.95);
+
+    const newImg = new Image();
+    newImg.crossOrigin = 'anonymous';
+    newImg.src = croppedBase64;
+    newImg.onload = () => {
+      imageRef.current = newImg;
+      canvas.width = Math.round(w);
+      canvas.height = Math.round(h);
+      setHistory([]);
+      setRedoList([]);
+      setCropSelection(null);
+      setSelectedTool('box');
+      redrawCanvas([]);
+    };
+  };
+
+  const handleCancelCrop = () => {
+    setCropSelection(null);
+    redrawCanvas(history, null, null);
+  };
+
   const handleUndo = () => {
-    if (history.length === 0) return;
-    const last = history[history.length - 1];
-    const updated = history.slice(0, history.length - 1);
-    setHistory(updated);
-    setRedoList((prev) => [last, ...prev]);
-    redrawCanvas(updated);
+    if (history.length > 0) {
+      const last = history[history.length - 1];
+      const updated = history.slice(0, history.length - 1);
+      setHistory(updated);
+      setRedoList((prev) => [last, ...prev]);
+      redrawCanvas(updated);
+    } else if (imageUndoStack.length > 0) {
+      // Undo image crop
+      const prevImgUrl = imageUndoStack[imageUndoStack.length - 1];
+      setImageUndoStack((prev) => prev.slice(0, prev.length - 1));
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = prevImgUrl;
+      img.onload = () => {
+        imageRef.current = img;
+        const canvas = canvasRef.current;
+        if (canvas) {
+          canvas.width = img.naturalWidth || 800;
+          canvas.height = img.naturalHeight || 600;
+        }
+        setCropSelection(null);
+        redrawCanvas([]);
+      };
+    }
   };
 
   const handleRedo = () => {
@@ -323,10 +522,11 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
   };
 
   const handleClear = () => {
-    if (history.length === 0) return;
+    if (history.length === 0 && !cropSelection) return;
     if (confirm('আপনি কি সব মার্কিং ও ড্রয়িং মুছে ফেলতে চান?')) {
       setHistory([]);
       setRedoList([]);
+      setCropSelection(null);
       redrawCanvas([]);
     }
   };
@@ -379,7 +579,31 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
           <div className="flex items-center gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700">
             <button
               type="button"
-              onClick={() => setSelectedTool('box')}
+              onClick={() => {
+                setSelectedTool('crop');
+                setCropSelection(null);
+                redrawCanvas(history);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                selectedTool === 'crop'
+                  ? 'bg-amber-600 text-white font-bold shadow-xs'
+                  : 'text-amber-400 hover:bg-slate-700/60'
+              }`}
+              title="Crop Image (ছবি ক্রপ করুন)"
+            >
+              <Crop className="w-4 h-4" />
+              <span>ক্রপ (Crop)</span>
+            </button>
+
+            <div className="w-px h-5 bg-slate-700 mx-0.5" />
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedTool('box');
+                setCropSelection(null);
+                redrawCanvas(history);
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
                 selectedTool === 'box'
                   ? 'bg-red-600 text-white font-bold shadow-xs'
@@ -393,7 +617,11 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
 
             <button
               type="button"
-              onClick={() => setSelectedTool('arrow')}
+              onClick={() => {
+                setSelectedTool('arrow');
+                setCropSelection(null);
+                redrawCanvas(history);
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
                 selectedTool === 'arrow'
                   ? 'bg-red-600 text-white font-bold shadow-xs'
@@ -407,7 +635,11 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
 
             <button
               type="button"
-              onClick={() => setSelectedTool('circle')}
+              onClick={() => {
+                setSelectedTool('circle');
+                setCropSelection(null);
+                redrawCanvas(history);
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
                 selectedTool === 'circle'
                   ? 'bg-red-600 text-white font-bold shadow-xs'
@@ -421,7 +653,11 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
 
             <button
               type="button"
-              onClick={() => setSelectedTool('pen')}
+              onClick={() => {
+                setSelectedTool('pen');
+                setCropSelection(null);
+                redrawCanvas(history);
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
                 selectedTool === 'pen'
                   ? 'bg-red-600 text-white font-bold shadow-xs'
@@ -435,7 +671,11 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
 
             <button
               type="button"
-              onClick={() => setSelectedTool('text')}
+              onClick={() => {
+                setSelectedTool('text');
+                setCropSelection(null);
+                redrawCanvas(history);
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition cursor-pointer ${
                 selectedTool === 'text'
                   ? 'bg-red-600 text-white font-bold shadow-xs'
@@ -448,8 +688,8 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
             </button>
           </div>
 
-          {/* Color & Stroke Width selector */}
-          <div className="flex items-center gap-3">
+          {/* Color & Stroke Width selector (dimmed during crop) */}
+          <div className={`flex items-center gap-3 transition ${selectedTool === 'crop' ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
             {/* Colors */}
             <div className="flex items-center gap-1.5 bg-slate-800/80 px-2 py-1 rounded-xl border border-slate-700">
               <Palette className="w-3.5 h-3.5 text-slate-400" />
@@ -501,9 +741,9 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
             <button
               type="button"
               onClick={handleUndo}
-              disabled={history.length === 0}
+              disabled={history.length === 0 && imageUndoStack.length === 0}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40 transition cursor-pointer"
-              title="Undo (পূর্বাবস্থায় ফেরান)"
+              title="Undo (পূর্বাবস্থায় ফেরান / ক্রপ আনডু)"
             >
               <Undo2 className="w-4 h-4" />
             </button>
@@ -519,7 +759,7 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
             <button
               type="button"
               onClick={handleClear}
-              disabled={history.length === 0}
+              disabled={history.length === 0 && !cropSelection}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 disabled:opacity-40 transition cursor-pointer"
               title="Clear All (সব মুছুন)"
             >
@@ -527,6 +767,44 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Active Crop Confirmation Bar */}
+        {selectedTool === 'crop' && cropSelection && (
+          <div className="px-5 py-2.5 bg-amber-950/95 border-b border-amber-600/60 flex flex-wrap items-center justify-between gap-3 text-xs animate-in fade-in">
+            <div className="flex items-center gap-2 text-amber-200">
+              <Crop className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                কাঙ্ক্ষিত ক্রপ সাইজ নির্বাচন করা হয়েছে: <strong className="text-amber-300 font-mono font-bold">{Math.round(Math.abs(cropSelection.endX - cropSelection.startX))} × {Math.round(Math.abs(cropSelection.endY - cropSelection.startY))} px</strong>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCancelCrop}
+                className="px-3 py-1.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-medium transition cursor-pointer"
+              >
+                বাতিল (Cancel)
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyCrop}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-bold shadow-md transition cursor-pointer"
+              >
+                <Check className="w-4 h-4" />
+                <span>✂️ ক্রপ প্রয়োগ করুন (Apply Crop)</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {selectedTool === 'crop' && !cropSelection && (
+          <div className="px-5 py-2 bg-slate-950 border-b border-amber-500/30 flex items-center justify-between text-xs text-amber-300">
+            <div className="flex items-center gap-2">
+              <Crop className="w-4 h-4 text-amber-400" />
+              <span>ছবির যে অংশটুকু রাখতে চান, মাউস দিয়ে সেটির চারদিকে ড্র্যাগ করে ক্রপ বক্স আঁকুন।</span>
+            </div>
+          </div>
+        )}
 
         {/* Canvas Workspace (Scrollable/Centered) */}
         <div className="flex-1 bg-slate-950 p-4 overflow-auto flex items-center justify-center select-none relative min-h-[420px]">
@@ -543,7 +821,9 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
         {/* Footer */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-slate-800 bg-slate-950/80">
           <div className="text-xs text-slate-400">
-            {history.length > 0 ? (
+            {selectedTool === 'crop' ? (
+              <span className="text-amber-400 font-medium">✂️ ক্রপ মোড সক্রিয়: ড্র্যাগ করে অংশ নির্বাচন করুন ও 'ক্রপ প্রয়োগ করুন' চাপুন।</span>
+            ) : history.length > 0 ? (
               <span>{history.length} টি মার্কিং যুক্ত করা হয়েছে</span>
             ) : (
               <span>ছবিতে ড্র্যাগ করে বক্স বা তীরচিহ্ন আঁকুন</span>

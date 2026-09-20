@@ -1,5 +1,6 @@
 import type { UserProfile, SOPStatus, AuditLogEntry, NotificationItem } from '../types/auth';
 import type { SOPDocument } from '../types/sop';
+import { defaultSopData } from '../data/defaultSopData';
 
 const DB_NAME = 'WaltonSopDB';
 const DB_VERSION = 2;
@@ -213,8 +214,41 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
+const DELETED_USERS_STORAGE_KEY = 'walton_sop_deleted_users_v1';
+
+export function getDeletedUserIds(): string[] {
+  try {
+    const raw = localStorage.getItem(DELETED_USERS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function markUserAsDeleted(userId: string): void {
+  try {
+    const list = getDeletedUserIds();
+    if (!list.includes(userId)) {
+      list.push(userId);
+      localStorage.setItem(DELETED_USERS_STORAGE_KEY, JSON.stringify(list));
+    }
+  } catch (e) {
+    console.warn('Failed to save deleted user id', e);
+  }
+}
+
+export function unmarkUserAsDeleted(userId: string): void {
+  try {
+    const list = getDeletedUserIds().filter((id) => id !== userId);
+    localStorage.setItem(DELETED_USERS_STORAGE_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.warn('Failed to unmark deleted user id', e);
+  }
+}
+
 // Seed / sync initial users into store
 async function seedInitialData(db: IDBDatabase): Promise<void> {
+  const deletedIds = getDeletedUserIds();
   return new Promise((resolve) => {
     const tx = db.transaction(STORE_USERS, 'readwrite');
     const store = tx.objectStore(STORE_USERS);
@@ -223,6 +257,10 @@ async function seedInitialData(db: IDBDatabase): Promise<void> {
     getAllReq.onsuccess = () => {
       const existing = (getAllReq.result as UserProfile[]) || [];
       INITIAL_USERS.forEach((initUser) => {
+        // Do not re-seed a user if deleted by Admin
+        if (deletedIds.includes(initUser.id)) {
+          return;
+        }
         const found = existing.find((u) => u.id === initUser.id);
         if (!found) {
           store.put(initUser);
@@ -273,17 +311,23 @@ export async function authenticateUser(usernameInput: string, passwordInput: str
 }
 
 export async function getAllUsers(): Promise<UserProfile[]> {
+  const deletedIds = getDeletedUserIds();
   try {
     const db = await openDatabase();
     return new Promise((resolve) => {
       const tx = db.transaction(STORE_USERS, 'readonly');
       const store = tx.objectStore(STORE_USERS);
       const req = store.getAll();
-      req.onsuccess = () => resolve(req.result.length > 0 ? req.result : INITIAL_USERS);
-      req.onerror = () => resolve(INITIAL_USERS);
+      req.onsuccess = () => {
+        const raw = req.result.length > 0 ? (req.result as UserProfile[]) : INITIAL_USERS;
+        resolve(raw.filter((u: UserProfile) => !deletedIds.includes(u.id)));
+      };
+      req.onerror = () => {
+        resolve(INITIAL_USERS.filter((u) => !deletedIds.includes(u.id)));
+      };
     });
   } catch {
-    return INITIAL_USERS;
+    return INITIAL_USERS.filter((u) => !deletedIds.includes(u.id));
   }
 }
 
@@ -344,6 +388,7 @@ export async function updateUserSignature(userId: string, signatureImg: string):
 }
 
 export async function addUser(user: UserProfile): Promise<boolean> {
+  unmarkUserAsDeleted(user.id);
   try {
     const db = await openDatabase();
     return new Promise((resolve) => {
@@ -359,6 +404,7 @@ export async function addUser(user: UserProfile): Promise<boolean> {
 }
 
 export async function updateUserProfile(user: UserProfile): Promise<boolean> {
+  unmarkUserAsDeleted(user.id);
   try {
     const db = await openDatabase();
     return new Promise((resolve) => {
@@ -374,6 +420,7 @@ export async function updateUserProfile(user: UserProfile): Promise<boolean> {
 }
 
 export async function deleteUser(userId: string): Promise<boolean> {
+  markUserAsDeleted(userId);
   try {
     const db = await openDatabase();
     return new Promise((resolve) => {
@@ -598,6 +645,215 @@ export async function deleteSOP(id: string): Promise<boolean> {
     });
   } catch {
     return false;
+  }
+}
+
+// ==================== PER-USER WORKSPACE & CROSS-PC DRAFTS ====================
+
+const USER_DRAFT_PREFIX = 'walton_sop_user_draft_v2_';
+
+export function createDefaultSopForUser(user: UserProfile): SOPDocument {
+  const now = new Date().toISOString();
+  const dateStr = now.split('T')[0];
+  const uniqueId = `sop_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+  return {
+    ...defaultSopData,
+    id: uniqueId,
+    status: 'draft',
+    authorId: user.id,
+    authorName: user.name,
+    createdAt: now,
+    updatedAt: now,
+    header: {
+      ...defaultSopData.header,
+      preparedBy: {
+        name: user.name,
+        designation: user.designation,
+        dept: user.department,
+        date: dateStr,
+        signatureImg: user.defaultSignatureImg || '',
+      },
+      checkedBy: {
+        name: 'Sazzad',
+        designation: 'Process Engineer / Section In-Charge',
+        signatureImg: '',
+      },
+      approvedBy: {
+        name: 'Kamrul (44819)',
+        designation: 'Process HOD',
+        signatureImg: '',
+      },
+    },
+    procedure: {
+      ...defaultSopData.procedure,
+      steps: [], // clean empty procedure
+    },
+    auditTrail: [
+      {
+        id: `log_${Date.now()}`,
+        action: 'create',
+        performedBy: user.username,
+        performedByName: user.name,
+        role: user.role,
+        timestamp: now,
+        note: `নতুন SOP ড্রাফট তৈরি করা হয়েছে (${user.name})`,
+      },
+    ],
+  };
+}
+
+export async function getUserWorkingDraft(userId: string): Promise<SOPDocument | null> {
+  // 1. Check user-specific localStorage key
+  try {
+    const raw = localStorage.getItem(USER_DRAFT_PREFIX + userId);
+    if (raw) {
+      const parsed: SOPDocument = JSON.parse(raw);
+      if (parsed) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Draft localStorage read failed', e);
+  }
+
+  // 2. Check IndexedDB for existing SOPs of this user
+  try {
+    const allSOPs = await getAllSOPs();
+    const userSops = allSOPs.filter(
+      (s) =>
+        s.authorId === userId ||
+        (s.header?.preparedBy?.name && s.header.preparedBy.name.toLowerCase().includes(userId.toLowerCase()))
+    );
+    if (userSops.length > 0) {
+      return userSops[0];
+    }
+  } catch (e) {
+    console.warn('IndexedDB user SOP lookup failed', e);
+  }
+
+  return null;
+}
+
+export async function saveUserWorkingDraft(userId: string, doc: SOPDocument): Promise<void> {
+  if (!userId || !doc) return;
+  const now = new Date().toISOString();
+  const updatedDoc: SOPDocument = {
+    ...doc,
+    authorId: doc.authorId || userId,
+    authorName: doc.authorName || doc.header?.preparedBy?.name || userId,
+    updatedAt: now,
+  };
+
+  // 1. Save to user-specific localStorage
+  try {
+    localStorage.setItem(USER_DRAFT_PREFIX + userId, JSON.stringify(updatedDoc));
+  } catch (e) {
+    console.warn('LocalStorage draft quota warning', e);
+  }
+
+  // 2. Also keep in IndexedDB so it survives browser cache purge
+  try {
+    await saveSOP(updatedDoc);
+  } catch (e) {
+    console.warn('IndexedDB auto-save draft warning', e);
+  }
+
+  // 3. Silent background cloud sync if available
+  try {
+    syncUserDraftWithCloud(userId, updatedDoc).catch(() => {});
+  } catch {}
+}
+
+// Multi-PC Cloud Sync Endpoint Configuration
+const CLOUD_SYNC_URL_KEY = 'walton_sop_cloud_sync_url';
+
+export function getCloudSyncUrl(): string {
+  return localStorage.getItem(CLOUD_SYNC_URL_KEY) || '/api/sync';
+}
+
+export function setCloudSyncUrl(url: string): void {
+  localStorage.setItem(CLOUD_SYNC_URL_KEY, url.trim());
+}
+
+export async function syncUserDraftWithCloud(userId: string, doc?: SOPDocument): Promise<SOPDocument | null> {
+  const syncUrl = getCloudSyncUrl();
+  try {
+    if (doc) {
+      // Push draft to cloud
+      const res = await fetch(`${syncUrl}?userId=${encodeURIComponent(userId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(doc),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        return json.doc || doc;
+      }
+    } else {
+      // Pull draft from cloud
+      const res = await fetch(`${syncUrl}?userId=${encodeURIComponent(userId)}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.doc) {
+          localStorage.setItem(USER_DRAFT_PREFIX + userId, JSON.stringify(json.doc));
+          return json.doc;
+        }
+      }
+    }
+  } catch {
+    // Silent fallback to local storage
+  }
+  return null;
+}
+
+// 1-Click Export of all user's drafts and data for transferring to another PC
+export async function exportUserWorkspaceBackup(userId: string): Promise<string> {
+  const draft = await getUserWorkingDraft(userId);
+  const allSOPs = await getAllSOPs();
+  const userSops = allSOPs.filter((s) => s.authorId === userId);
+
+  const payload = {
+    appName: 'Walton SOP Maker Enterprise',
+    exportType: 'user_workspace_backup',
+    userId,
+    exportedAt: new Date().toISOString(),
+    activeDraft: draft,
+    sops: userSops,
+  };
+
+  return JSON.stringify(payload, null, 2);
+}
+
+// 1-Click Import of workspace from another PC
+export async function importUserWorkspaceBackup(
+  userId: string,
+  jsonString: string
+): Promise<{ success: boolean; doc: SOPDocument | null; message: string }> {
+  try {
+    const data = JSON.parse(jsonString);
+    if (!data.activeDraft && (!data.sops || !Array.isArray(data.sops))) {
+      return { success: false, doc: null, message: 'অকার্যকর ব্যাকআপ ফাইল ফরম্যাট।' };
+    }
+
+    const docToRestore: SOPDocument = data.activeDraft || data.sops[0];
+    if (docToRestore) {
+      await saveUserWorkingDraft(userId, docToRestore);
+    }
+
+    if (data.sops && Array.isArray(data.sops)) {
+      for (const s of data.sops) {
+        await saveSOP(s);
+      }
+    }
+
+    return {
+      success: true,
+      doc: docToRestore || null,
+      message: 'অন্য PC-এর ড্রাফট ও SOP ডাটা সফলভাবে বর্তমান সিস্টেমে লোড হয়েছে!',
+    };
+  } catch (err: any) {
+    return { success: false, doc: null, message: 'ব্যাকআপ ফাইলটি পড়তে ব্যর্থ হয়েছে: ' + err.message };
   }
 }
 

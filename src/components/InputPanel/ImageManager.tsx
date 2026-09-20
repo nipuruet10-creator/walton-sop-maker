@@ -15,6 +15,7 @@ import {
   Layers,
   ClipboardPaste,
   Sparkles,
+  Crop,
 } from 'lucide-react';
 
 interface ImageManagerProps {
@@ -38,8 +39,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const replaceTargetIndex = useRef<number | null>(null);
 
-  // Annotation state
+  // Annotation & Crop state
   const [annotatingIndex, setAnnotatingIndex] = useState<number | null>(null);
+  const [modalInitialTool, setModalInitialTool] = useState<'box' | 'crop'>('box');
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -363,12 +365,29 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
               </span>
             </div>
 
-            {/* Actions: Annotate, Move Up/Down, Replace, Delete */}
+            {/* Actions: Annotate, Crop, Move Up/Down, Replace, Delete */}
             <div className="flex items-center gap-1 shrink-0">
+              {/* Crop Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setModalInitialTool('crop');
+                  setAnnotatingIndex(index);
+                }}
+                className="flex items-center gap-1 px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                title="ছবি ক্রপ / সাইজ কেটে সোজা করুন"
+              >
+                <Crop className="w-3.5 h-3.5 text-amber-600" />
+                <span className="hidden sm:inline">ক্রপ</span>
+              </button>
+
               {/* Annotate / Mark Button */}
               <button
                 type="button"
-                onClick={() => setAnnotatingIndex(index)}
+                onClick={() => {
+                  setModalInitialTool('box');
+                  setAnnotatingIndex(index);
+                }}
                 className="flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-[11px] font-bold transition cursor-pointer"
                 title="ছবিতে লাল বক্স, তীরচিহ্ন, ও ড্রয়িং যোগ করুন"
               >
@@ -422,6 +441,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
           onClose={() => setAnnotatingIndex(null)}
           imageUrl={photos[annotatingIndex].url}
           photoLabel={photos[annotatingIndex].label}
+          initialTool={modalInitialTool}
           onSave={handleSaveAnnotatedPhoto}
         />
       )}

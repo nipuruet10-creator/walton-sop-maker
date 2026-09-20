@@ -13,7 +13,6 @@ import {
   LogIn,
   LogOut,
   FolderArchive,
-  ShieldCheck,
   BarChart3,
   ShieldAlert,
   Bell,
@@ -27,7 +26,6 @@ interface NavbarProps {
   onLogout: () => void;
   onOpenWorkspace: () => void;
   onOpenMasterArchive: () => void;
-  onOpenConcernSection: () => void;
   onOpenAnalytics: () => void;
   onOpenAdminPanel: () => void;
   onSelectSopById?: (sopId: string) => void;
@@ -50,7 +48,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onOpenWorkspace,
   onOpenMasterArchive,
-  onOpenConcernSection,
   onOpenAnalytics,
   onOpenAdminPanel,
   onSelectSopById,
@@ -105,27 +102,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={onOpenMasterArchive}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/60 text-xs font-semibold transition cursor-pointer"
-            title="সকল প্রস্তুতকারীর SOP মাস্টার আর্কাইভ ও স্থায়ী ব্যাকআপ"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-900/80 hover:bg-indigo-800 text-indigo-100 border border-indigo-600/70 text-xs font-semibold shadow-xs transition cursor-pointer"
+            title="অনুমোদিত ও সংরক্ষিত সমস্ত SOP আর্কাইভ"
           >
-            <FolderArchive className="w-3.5 h-3.5 text-indigo-400" />
-            <span>মাস্টার আর্কাইভ</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenConcernSection}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/60 text-xs font-semibold transition cursor-pointer"
-            title="অনুমোদিত SOP কেন্দ্রীয় আর্কাইভ ও সরাসরি PDF ডাউনলোড"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>কনসার্ন সেকশন</span>
+            <FolderArchive className="w-3.5 h-3.5 text-indigo-300" />
+            <span>আর্কাইভ</span>
           </button>
 
           <button
             type="button"
             onClick={onOpenAnalytics}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700 text-xs font-semibold transition cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700 text-xs font-semibold transition cursor-pointer"
             title="মাসভিত্তিক ও ইউজারভিত্তিক SOP সম্পন্ন রিপোর্ট"
           >
             <BarChart3 className="w-3.5 h-3.5 text-blue-400" />
@@ -136,7 +123,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenAdminPanel}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-950/70 hover:bg-rose-900 text-rose-200 border border-rose-800/80 text-xs font-semibold transition cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 text-rose-200 border border-rose-800/80 text-xs font-semibold transition cursor-pointer"
               title="ইউজার ম্যানেজমেন্ট ও সেন্ট্রাল AI কনফিগারেশন"
             >
               <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
@@ -160,23 +147,32 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
       </div>
 
-      {/* Right: Notification Bell, User Profile, Export & Utility Tools */}
+      {/* Right: Highly Visible Notification Bell, User Profile, Export & Utility Tools */}
       <div className="flex items-center gap-2 flex-wrap">
-        {/* Notification Bell 🔔 */}
+        {/* Notification Bell 🔔 (Ultra-Visible & Eye-Catching) */}
         {currentUser && (
           <div className="relative" ref={notifRef}>
             <button
               type="button"
               onClick={() => setIsNotifOpen(!isNotifOpen)}
-              className="relative p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition cursor-pointer"
-              title="নতুন নোটিফিকেশন"
+              className={`relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer active:scale-95 ${
+                unreadCount > 0
+                  ? 'bg-gradient-to-r from-rose-600 via-rose-500 to-amber-600 text-white shadow-lg shadow-rose-950/60 ring-2 ring-amber-300 ring-offset-2 ring-offset-slate-900 animate-pulse'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600'
+              }`}
+              title={unreadCount > 0 ? `নতুন ${unreadCount}টি নোটিফিকেশন / পেন্ডিং রিভিউ আছে!` : 'নোটিফিকেশন সেন্টার'}
             >
-              <Bell className="w-4 h-4" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shadow-md animate-pulse">
-                  {unreadCount}
-                </span>
-              )}
+              <div className="relative flex items-center justify-center">
+                <Bell className={`w-4 h-4 ${unreadCount > 0 ? 'text-amber-200 fill-amber-300' : 'text-slate-300'}`} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-4 h-4 px-1 bg-amber-400 text-slate-950 text-[10px] font-black rounded-full flex items-center justify-center shadow-md border border-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
+              <span className="hidden sm:inline font-bold">
+                {unreadCount > 0 ? `নোটিফিকেশন (${unreadCount})` : 'নোটিফিকেশন'}
+              </span>
             </button>
 
             {/* Notification Dropdown Popover */}
@@ -281,17 +277,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             type="button"
             onClick={onOpenMasterArchive}
             className="p-1.5 rounded-lg bg-indigo-900/60 text-indigo-300 border border-indigo-700"
-            title="মাস্টার আর্কাইভ"
+            title="আর্কাইভ"
           >
             <FolderArchive className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={onOpenConcernSection}
-            className="p-1.5 rounded-lg bg-emerald-900/60 text-emerald-300 border border-emerald-700"
-            title="কনসার্ন সেকশন"
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"

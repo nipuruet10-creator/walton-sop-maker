@@ -12,7 +12,6 @@ import { TablesEditor } from './components/InputPanel/TablesEditor';
 import { SOPPaper } from './components/Preview/SOPPaper';
 import { LoginModal } from './components/Auth/LoginModal';
 import { UserWorkspaceModal } from './components/Workspace/UserWorkspaceModal';
-import { ConcernSectionView } from './components/Archive/ConcernSectionView';
 import { MasterArchiveModal } from './components/Archive/MasterArchiveModal';
 import { AnalyticsDashboardModal } from './components/Analytics/AnalyticsDashboardModal';
 import { AdminPanelModal } from './components/Admin/AdminPanelModal';
@@ -33,6 +32,9 @@ import {
   getGlobalAiConfig,
   getUserNotifications,
   getSOPById,
+  getUserWorkingDraft,
+  saveUserWorkingDraft,
+  createDefaultSopForUser,
 } from './services/storageService';
 import { exportSOPToExcel } from './services/excelExporter';
 import { downloadSOPAsPdf } from './services/pdfExporter';
@@ -51,26 +53,29 @@ import {
   LayoutGrid,
 } from 'lucide-react';
 
-const STORAGE_KEY = 'walton_sop_current_doc_v2';
 const GEMINI_KEY_STORAGE = 'walton_sop_gemini_key';
 
 type ActiveTab = 'photos' | 'procedure' | 'header' | 'safety' | 'tables';
 
 export const App: React.FC = () => {
-  // Current SOP document state
-  const [data, setData] = useState<SOPDocument>(() => {
-    try {
-      const cached = localStorage.getItem(STORAGE_KEY);
-      if (cached) return JSON.parse(cached);
-    } catch (e) {
-      console.error('Failed to parse cached SOP', e);
-    }
-    return defaultSopData;
-  });
-
   // User session state (mandatory login on first visit or when logged out)
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     return getActiveUserSession() || null;
+  });
+
+  // Current SOP document state - strictly isolated per logged-in user!
+  const [data, setData] = useState<SOPDocument>(() => {
+    const session = getActiveUserSession();
+    if (session) {
+      try {
+        const cached = localStorage.getItem(`walton_sop_user_draft_v2_${session.id}`);
+        if (cached) return JSON.parse(cached);
+      } catch (e) {
+        console.error('Failed to parse cached user SOP', e);
+      }
+      return createDefaultSopForUser(session);
+    }
+    return defaultSopData;
   });
 
   // Modals state
@@ -79,7 +84,6 @@ export const App: React.FC = () => {
   });
   const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState<boolean>(false);
   const [isMasterArchiveOpen, setIsMasterArchiveOpen] = useState<boolean>(false);
-  const [isConcernSectionOpen, setIsConcernSectionOpen] = useState<boolean>(false);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState<boolean>(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
 
@@ -154,14 +158,12 @@ export const App: React.FC = () => {
 
   const importFileRef = useRef<HTMLInputElement>(null);
 
-  // Auto-save to localStorage and IndexedDB
+  // Auto-save strictly to currentUser's working draft
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-      console.warn('LocalStorage quota reached, photos may be large', e);
+    if (currentUser) {
+      saveUserWorkingDraft(currentUser.id, data);
     }
-  }, [data]);
+  }, [data, currentUser?.id]);
 
   // Keyboard shortcut listener (Ctrl+P to print)
   useEffect(() => {
@@ -175,36 +177,32 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleLoginSuccess = (user: UserProfile) => {
+  const handleLoginSuccess = async (user: UserProfile) => {
     setCurrentUser(user);
     setActiveUserSession(user);
     setIsLoginModalOpen(false);
-    setData((prev) => {
-      if (!prev.header.preparedBy.name) {
-        return {
-          ...prev,
-          authorId: user.id,
-          authorName: user.name,
-          header: {
-            ...prev.header,
-            preparedBy: {
-              ...prev.header.preparedBy,
-              name: user.name,
-              designation: user.designation,
-              dept: user.department,
-              date: new Date().toISOString().split('T')[0],
-              signatureImg: user.defaultSignatureImg || prev.header.preparedBy.signatureImg,
-            },
-          },
-        };
+    try {
+      const draft = await getUserWorkingDraft(user.id);
+      if (draft) {
+        setData(draft);
+      } else {
+        const fresh = createDefaultSopForUser(user);
+        setData(fresh);
+        await saveUserWorkingDraft(user.id, fresh);
       }
-      return prev;
-    });
+    } catch {
+      const fresh = createDefaultSopForUser(user);
+      setData(fresh);
+    }
   };
 
   const handleLogout = () => {
+    if (currentUser) {
+      saveUserWorkingDraft(currentUser.id, data);
+    }
     setCurrentUser(null);
     setActiveUserSession(null);
+    setData(defaultSopData);
     setIsLoginModalOpen(true);
   };
 
@@ -265,27 +263,14 @@ export const App: React.FC = () => {
   };
 
   const handleNewSop = () => {
-    setData({
-      ...defaultSopData,
-      id: undefined,
-      status: 'draft',
-      authorId: currentUser?.id || 'Biplob',
-      authorName: currentUser?.name || 'Biplob Hossain',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      header: {
-        ...defaultSopData.header,
-        processName: 'New Assembly Process',
-        effectiveDate: new Date().toISOString().split('T')[0],
-        preparedBy: {
-          name: currentUser?.name || 'Biplob Hossain',
-          designation: currentUser?.designation || 'Process Engineer',
-          dept: currentUser?.department || 'Process Automation',
-          date: new Date().toISOString().split('T')[0],
-          signatureImg: currentUser?.defaultSignatureImg,
-        },
-      },
-    });
+    if (currentUser) {
+      const fresh = createDefaultSopForUser(currentUser);
+      setData(fresh);
+      saveUserWorkingDraft(currentUser.id, fresh);
+      setIsWorkspaceModalOpen(false);
+    } else {
+      setData(defaultSopData);
+    }
   };
 
   // Main Procedure Step Generation
@@ -406,7 +391,6 @@ export const App: React.FC = () => {
         onLogout={handleLogout}
         onOpenWorkspace={() => setIsWorkspaceModalOpen(true)}
         onOpenMasterArchive={() => setIsMasterArchiveOpen(true)}
-        onOpenConcernSection={() => setIsConcernSectionOpen(true)}
         onOpenAnalytics={() => setIsAnalyticsModalOpen(true)}
         onOpenAdminPanel={() => setIsAdminModalOpen(true)}
         onPrint={handlePrint}
@@ -810,13 +794,6 @@ export const App: React.FC = () => {
         onSelectSop={(sop) => setData(sop)}
         onNewSop={handleNewSop}
         onOpenLogin={() => setIsLoginModalOpen(true)}
-      />
-
-      {/* Concern Section / Approved Archive Modal */}
-      <ConcernSectionView
-        isOpen={isConcernSectionOpen}
-        onClose={() => setIsConcernSectionOpen(false)}
-        onViewOnCanvas={(sop) => setData(sop)}
       />
 
       {/* Analytics & Performance Dashboard Modal */}

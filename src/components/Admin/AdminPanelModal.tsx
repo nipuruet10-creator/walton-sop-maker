@@ -12,6 +12,8 @@ import {
   getGlobalAiConfig,
   saveGlobalAiConfig,
   type GlobalAiConfig,
+  getCloudSyncUrl,
+  setCloudSyncUrl,
 } from '../../services/storageService';
 import {
   testOpenRouterKey,
@@ -40,6 +42,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ExternalLink,
+  Laptop,
 } from 'lucide-react';
 
 interface AdminPanelModalProps {
@@ -86,6 +89,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
   const [editDesignation, setEditDesignation] = useState<string>('');
   const [editDepartment, setEditDepartment] = useState<string>('');
 
+  // Multi-PC Cloud Sync settings
+  const [syncUrl, setSyncUrl] = useState<string>(getCloudSyncUrl);
+  const [syncSavedMsg, setSyncSavedMsg] = useState<string | null>(null);
+
+  const handleSaveSyncUrl = () => {
+    setCloudSyncUrl(syncUrl);
+    setSyncSavedMsg('ক্লাউড সিঙ্ক URL সফলভাবে সংরক্ষিত হয়েছে!');
+    setTimeout(() => setSyncSavedMsg(null), 3500);
+  };
+
   const fetchUsers = async () => {
     const list = await getAllUsers();
     setUsers(list);
@@ -94,6 +107,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
   useEffect(() => {
     if (isOpen) {
       fetchUsers();
+      setSyncUrl(getCloudSyncUrl());
       const currentConfig = getGlobalAiConfig();
       setAiConfig(currentConfig);
       if (currentConfig.openRouterKey) {
@@ -207,19 +221,23 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
       createdAt: new Date().toISOString(),
     };
 
+    // Optimistic UI update
+    setUsers((prev) => [...prev, newUser]);
+    setIsAddModalOpen(false);
+    setNewUserId('');
+    setNewUserEmpId('');
+    setNewUserName('');
+    setNewUserDesignation('');
+    setNewUserDepartment('Process Development');
+    setNewUserPassword('Process@2026');
+
     const ok = await addUser(newUser);
     if (ok) {
-      showNotification(`অনুমোদনকারী "${cleanName}" (${cleanId}) সফলভাবে যুক্ত করা হয়েছে!`);
-      setIsAddModalOpen(false);
-      setNewUserId('');
-      setNewUserEmpId('');
-      setNewUserName('');
-      setNewUserDesignation('');
-      setNewUserDepartment('Process Development');
-      setNewUserPassword('Process@2026');
+      showNotification(`কর্মকর্তা "${cleanName}" (${cleanId}) সফলভাবে যুক্ত করা হয়েছে!`);
       await fetchUsers();
     } else {
       alert('ইউজার যুক্ত করতে সমস্যা হয়েছে।');
+      await fetchUsers();
     }
   };
 
@@ -247,13 +265,17 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
       department: editDepartment.trim() || editingUser.department,
     };
 
+    // Optimistic UI update
+    setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+    setEditingUser(null);
+
     const ok = await updateUserProfile(updatedUser);
     if (ok) {
       showNotification(`"${updatedUser.name}" এর তথ্য ও সিকোয়েন্স সফলভাবে আপডেট করা হয়েছে!`);
-      setEditingUser(null);
       await fetchUsers();
     } else {
       alert('তথ্য আপডেট ব্যর্থ হয়েছে।');
+      await fetchUsers();
     }
   };
 
@@ -264,10 +286,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
       return;
     }
 
-    const confirmed = confirm(
-      `আপনি কি নিশ্চিতভাবে "${user.name}" (ID: ${user.id}, Role: ${user.role}) কে অনুমোদন রুট থেকে মুছে ফেলতে চান?`
+    const confirmed = window.confirm(
+      `আপনি কি নিশ্চিতভাবে "${user.name}" (ID: ${user.id}, Role: ${user.role}) কে মুছে ফেলতে চান?`
     );
     if (!confirmed) return;
+
+    // Optimistic UI update: card vanishes instantly
+    setUsers((prev) => prev.filter((u) => u.id !== user.id));
 
     const ok = await deleteUser(user.id);
     if (ok) {
@@ -275,6 +300,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
       await fetchUsers();
     } else {
       alert('ইউজার মুছতে ব্যর্থ হয়েছে।');
+      await fetchUsers();
     }
   };
 
@@ -1008,6 +1034,52 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   <span>JSON ব্যাকআপ ফাইল সিলেক্ট করুন</span>
                   <input type="file" accept=".json" onChange={handleImportBackup} className="hidden" />
                 </label>
+              </div>
+
+              {/* Multi-PC Cloud Sync Configuration Card */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                    <Laptop className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">মাল্টি-পিসি ক্লাউড সিঙ্ক কনফিগারেশন (Multi-PC Cloud Sync API)</h3>
+                    <p className="text-xs text-slate-500">
+                      ফ্যাক্টরির যে কোনো পিসি থেকে ইউজাররা তাদের সর্বশেষ খসড়া বা কাজ শুরু করতে এই এন্ডপয়েন্ট ব্যবহার করে।
+                    </p>
+                  </div>
+                </div>
+
+                {syncSavedMsg && (
+                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-2.5 rounded-xl font-medium">
+                    {syncSavedMsg}
+                  </div>
+                )}
+
+                <div className="space-y-2 text-xs">
+                  <label className="block font-semibold text-slate-700">
+                    ক্লাউড সিঙ্ক সার্ভার URL (API Endpoint):
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={syncUrl}
+                      onChange={(e) => setSyncUrl(e.target.value)}
+                      placeholder="/api/sync বা https://..."
+                      className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 font-mono focus:outline-none focus:border-blue-600"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveSyncUrl}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs"
+                    >
+                      সেভ করুন
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    ডিফল্ট মান: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-700">/api/sync</code> (ভার্সেল সার্ভারলেস সিঙ্ক)। কোম্পানি ইন্টারনাল সার্ভার থাকলে তার URL দিতে পারেন।
+                  </p>
+                </div>
               </div>
             </div>
           )}

@@ -2,7 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { UserProfile } from '../../types/auth';
 import type { SOPDocument } from '../../types/sop';
-import { getAllSOPs, deleteSOP, saveSOP } from '../../services/storageService';
+import {
+  getAllSOPs,
+  deleteSOP,
+  saveSOP,
+  exportUserWorkspaceBackup,
+  importUserWorkspaceBackup,
+  syncUserDraftWithCloud,
+} from '../../services/storageService';
 import {
   FileText,
   Trash2,
@@ -14,6 +21,11 @@ import {
   User,
   X,
   Inbox,
+  CheckCircle2,
+  Laptop,
+  Download,
+  Upload,
+  RefreshCw,
 } from 'lucide-react';
 
 interface UserWorkspaceModalProps {
@@ -33,10 +45,12 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
   onNewSop,
   onOpenLogin,
 }) => {
-  const [activeTab, setActiveTab] = useState<'my_sops' | 'pending_queue'>('my_sops');
+  const [activeTab, setActiveTab] = useState<'my_sops' | 'pending_queue' | 'approved_sops'>('my_sops');
   const [allDocs, setAllDocs] = useState<SOPDocument[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const transferInputRef = React.useRef<HTMLInputElement>(null);
 
   const fetchDocs = async () => {
     setLoading(true);
@@ -106,10 +120,7 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
     );
   });
 
-  // Filter Pending Queue for this user:
-  // If user is Admin: all pending docs
-  // If user is Checked By: docs with status 'forwarded_to_checker' and assigned to them (or all if not assigned)
-  // If user is Approved By (Kamrul): docs with status 'forwarded_to_approver'
+  // Filter Pending Queue for this user
   const pendingQueue = allDocs.filter((doc) => {
     if (currentUser.role === 'admin') {
       return doc.status === 'forwarded_to_checker' || doc.status === 'forwarded_to_approver';
@@ -126,7 +137,15 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
     return false;
   });
 
-  const displayedList = activeTab === 'my_sops' ? mySops : pendingQueue;
+  // Filter Approved SOPs: all approved SOPs for view/download from user's panel
+  const approvedSops = allDocs.filter((doc) => doc.status === 'approved');
+
+  const displayedList =
+    activeTab === 'my_sops'
+      ? mySops
+      : activeTab === 'pending_queue'
+      ? pendingQueue
+      : approvedSops;
 
   const filteredList = displayedList.filter((doc) => {
     if (!searchTerm.trim()) return true;
@@ -161,6 +180,68 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
     await saveSOP(copy, currentUser, 'SOP ডুপ্লিকেট করা হয়েছে');
     await fetchDocs();
     alert('SOP সফলভাবে কপি করা হয়েছে!');
+  };
+
+  const handleExportWorkspace = async () => {
+    if (!currentUser) return;
+    try {
+      const jsonStr = await exportUserWorkspaceBackup(currentUser.id);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `walton_sop_${currentUser.username.toLowerCase()}_workspace.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert('এক্সপোর্ট ত্রুটি: ' + e.message);
+    }
+  };
+
+  const handleImportWorkspace = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentUser) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const text = evt.target?.result as string;
+        const res = await importUserWorkspaceBackup(currentUser.id, text);
+        if (res.success) {
+          alert(res.message);
+          if (res.doc) {
+            onSelectSop(res.doc);
+          }
+          await fetchDocs();
+        } else {
+          alert(res.message);
+        }
+      } catch (err: any) {
+        alert('ফাইল লোড করতে ব্যর্থ হয়েছে: ' + err.message);
+      } finally {
+        if (transferInputRef.current) transferInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleCloudSync = async () => {
+    if (!currentUser) return;
+    setIsSyncing(true);
+    try {
+      const syncedDoc = await syncUserDraftWithCloud(currentUser.id);
+      if (syncedDoc) {
+        onSelectSop(syncedDoc);
+        alert('ক্লাউড থেকে সফলভাবে আপনার সর্বশেষ কাজ লোড করা হয়েছে!');
+      } else {
+        alert('ক্লাউড সিঙ্ক সম্পন্ন হয়েছে (ডাটাবেস আপ-টু-ডেট আছে)।');
+      }
+      await fetchDocs();
+    } catch {
+      alert('ক্লাউড সিঙ্ক করতে সমস্যা হয়েছে। লোকাল ডাটা সুরক্ষিত রয়েছে।');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const getStatusPill = (status?: string) => {
@@ -222,6 +303,61 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
           </div>
         </div>
 
+        {/* Multi-PC Sync & Transfer Banner */}
+        <div className="px-6 py-2.5 bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 text-white flex flex-wrap items-center justify-between gap-3 text-xs border-b border-blue-800/40 shadow-inner">
+          <div className="flex items-center gap-2">
+            <span className="p-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-400/30">
+              <Laptop className="w-3.5 h-3.5" />
+            </span>
+            <span className="text-slate-200">
+              <strong>মাল্টি-পিসি সিঙ্ক:</strong> যেকোনো পিসি থেকে কাজ পুনরায় শুরু করতে ব্যাকআপ বা ক্লাউড সিঙ্ক ব্যবহার করুন।
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Cloud Sync */}
+            <button
+              type="button"
+              onClick={handleCloudSync}
+              disabled={isSyncing}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition cursor-pointer text-[11px] shadow-xs disabled:opacity-50"
+              title="ক্লাউডের সাথে ড্রাফট সিঙ্ক করুন"
+            >
+              <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>{isSyncing ? 'সিঙ্ক হচ্ছে...' : '🔄 ক্লাউড সিঙ্ক'}</span>
+            </button>
+
+            {/* Export for another PC */}
+            <button
+              type="button"
+              onClick={handleExportWorkspace}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-semibold transition cursor-pointer text-[11px]"
+              title="এই পিসির কাজ অন্য পিসিতে নিতে ব্যাকআপ ফাইল ডাউনলোড করুন"
+            >
+              <Download className="w-3.5 h-3.5 text-sky-400" />
+              <span>পিসি ব্যাকআপ এক্সপোর্ট</span>
+            </button>
+
+            {/* Import from another PC */}
+            <button
+              type="button"
+              onClick={() => transferInputRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg font-semibold transition cursor-pointer text-[11px] shadow-xs"
+              title="অন্য পিসির ব্যাকআপ ফাইল থেকে কাজ লোড করুন"
+            >
+              <Upload className="w-3.5 h-3.5 text-emerald-200" />
+              <span>অন্য PC-এর কাজ লোড</span>
+            </button>
+            <input
+              type="file"
+              ref={transferInputRef}
+              onChange={handleImportWorkspace}
+              accept=".json"
+              className="hidden"
+            />
+          </div>
+        </div>
+
         {/* Tabs & Search Bar */}
         <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
@@ -236,6 +372,19 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
             >
               <FolderArchive className="w-3.5 h-3.5" />
               <span>আমার সংরক্ষিত SOP সমূহ ({mySops.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('approved_sops')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+                activeTab === 'approved_sops'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200'
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              <span>অনুমোদিত SOP সমূহ ({approvedSops.length})</span>
             </button>
 
             {(currentUser.role === 'checked_by' || currentUser.role === 'approved_by' || currentUser.role === 'admin') && (

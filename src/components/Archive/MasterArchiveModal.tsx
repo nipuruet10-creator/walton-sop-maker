@@ -29,7 +29,7 @@ interface MasterArchiveModalProps {
   onClose: () => void;
   currentUser: UserProfile | null;
   onSelectSop: (sop: SOPDocument) => void;
-  initialTab?: 'all_archive' | 'concern_section';
+  initialTab?: 'all_archive' | 'approved_sops';
 }
 
 export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
@@ -37,9 +37,9 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
   onClose,
   currentUser,
   onSelectSop,
-  initialTab = 'all_archive',
+  initialTab = 'approved_sops',
 }) => {
-  const [activeTab, setActiveTab] = useState<'all_archive' | 'concern_section'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'all_archive' | 'approved_sops'>(initialTab);
   const [allDocs, setAllDocs] = useState<SOPDocument[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedAuthor, setSelectedAuthor] = useState<string>('all');
@@ -93,7 +93,7 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
 
   // Apply tab, author filter, status filter, search query
   const filteredDocs = visibleDocs.filter((doc) => {
-    if (activeTab === 'concern_section' && doc.status !== 'approved') {
+    if (activeTab === 'approved_sops' && doc.status !== 'approved') {
       return false;
     }
 
@@ -236,13 +236,13 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold tracking-tight">Walton Master SOP Archive & Concern Section</h2>
+                <h2 className="text-base font-bold tracking-tight">Walton SOP Archive (এসওপি আর্কাইভ)</h2>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
                   Total: {allDocs.length} SOPs
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                কেন্দ্রীয় এসওপি আর্কাইভ, প্রস্তুতকারী অনুযায়ী ফিল্টারিং এবং স্থায়ী ক্লাউড ব্যাকআপ
+                সকল অনুমোদিত ও প্রস্তুতকৃত SOP কেন্দ্রীয় আর্কাইভ, প্রস্তুতকারী অনুযায়ী ফিল্টারিং এবং স্থায়ী ব্যাকআপ
               </p>
             </div>
           </div>
@@ -282,6 +282,19 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
             <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs">
               <button
                 type="button"
+                onClick={() => setActiveTab('approved_sops')}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-bold transition cursor-pointer ${
+                  activeTab === 'approved_sops'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>অনুমোদিত SOP ({allDocs.filter((d) => d.status === 'approved').length})</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setActiveTab('all_archive')}
                 className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-bold transition cursor-pointer ${
                   activeTab === 'all_archive'
@@ -290,20 +303,7 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
                 }`}
               >
                 <FolderArchive className="w-3.5 h-3.5" />
-                <span>মাস্টার আর্কাইভ ({allDocs.length})</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('concern_section')}
-                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg font-bold transition cursor-pointer ${
-                  activeTab === 'concern_section'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>কনসার্ন সেকশন ({allDocs.filter((d) => d.status === 'approved').length})</span>
+                <span>সকল SOP আর্কাইভ ({allDocs.length})</span>
               </button>
             </div>
 
@@ -388,7 +388,7 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
               <FolderArchive className="w-12 h-12 text-slate-300 mx-auto" />
               <h3 className="font-bold text-slate-700 text-sm">কোনো SOP পাওয়া যায়নি</h3>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                {activeTab === 'concern_section'
+                {activeTab === 'approved_sops'
                   ? 'এখনও কোনো SOP চূড়ান্তভাবে অনুমোদিত হয়নি। কামরুল হাসান (Process HOD) অনুমোদন করলে তা এখানে চলে আসবে।'
                   : 'বর্তমান ফিল্টারের আওতায় কোনো সংরক্ষিত SOP পাওয়া যায়নি।'}
               </p>
