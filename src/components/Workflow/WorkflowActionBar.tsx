@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { UserProfile } from '../../types/auth';
 import type { SOPDocument } from '../../types/sop';
@@ -20,8 +20,8 @@ import {
   ShieldCheck,
   Upload,
   X,
-  ArrowRight,
-  FilePlus,
+  FolderArchive,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 interface WorkflowActionBarProps {
@@ -40,8 +40,6 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
   onUpdateSop,
   onOpenWorkspace,
   onOpenLogin,
-  onNewSop,
-  onResetSop,
 }) => {
   const [isForwardModalOpen, setIsForwardModalOpen] = useState<boolean>(false);
   const [selectedCheckerId, setSelectedCheckerId] = useState<string>('Sazzad');
@@ -51,6 +49,8 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
   const [rejectReason, setRejectReason] = useState<string>('');
   const [checkers, setCheckers] = useState<UserProfile[]>([]);
+  const [isAdminMenuOpen, setIsAdminMenuOpen] = useState<boolean>(false);
+  const adminMenuRef = useRef<HTMLDivElement>(null);
 
   const status = currentSop.status || 'draft';
 
@@ -67,7 +67,18 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
     });
   }, [isForwardModalOpen]);
 
-  // Handle Save to Archive
+  // Close admin menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (adminMenuRef.current && !adminMenuRef.current.contains(e.target as Node)) {
+        setIsAdminMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Handle Save to Personal Archive
   const handleSaveArchive = async () => {
     if (!currentUser) {
       onOpenLogin();
@@ -196,117 +207,153 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
     setIsSignModalOpen(true);
   };
 
+  const isAuthor = currentUser?.role === 'prepared_by' || currentUser?.role === 'admin';
+  const isChecker = currentUser?.role === 'checked_by' || currentUser?.role === 'admin';
+  const isApprover = currentUser?.role === 'approved_by' || currentUser?.role === 'admin';
+  const isAdmin = currentUser?.role === 'admin';
+
   return (
-    <div className="no-print w-full bg-white border-b border-slate-200 shadow-xs px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs z-30">
-      {/* Left: Visual 3-Stage Approval Pipeline */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider hidden sm:inline">
+    <div className="no-print w-full bg-slate-50 border-b border-slate-200/90 shadow-xs px-3 sm:px-4 py-1.5 flex items-center justify-between gap-3 text-xs z-30 select-none flex-nowrap overflow-x-auto scrollbar-none">
+      {/* Left: Connected 3-Stage Approval Stepper */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider hidden xl:inline">
           অনুমোদন রুট:
         </span>
 
         {/* Step 1: Prepared By */}
         <div
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl font-medium transition ${
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition border ${
             status === 'draft'
-              ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-xs font-bold'
-              : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+              ? 'bg-amber-50 text-amber-950 border-amber-300 shadow-xs font-bold ring-1 ring-amber-200'
+              : 'bg-white text-slate-700 border-slate-200 shadow-2xs'
           }`}
+          title="প্রস্তুতকারী (Process Concern)"
         >
-          <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold">
+          <span className="w-4 h-4 rounded-full bg-slate-700 text-white flex items-center justify-center text-[10px] font-bold">
             ১
           </span>
-          <span>প্রস্তুত (Process concern): <strong>{currentSop.authorName || currentSop.header.preparedBy.name || 'Biplob'}</strong></span>
-          {currentSop.header.preparedBy.signatureImg && (
-            <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1 rounded font-bold">Signed</span>
+          <span className="hidden md:inline text-slate-500 font-normal">প্রস্তুত:</span>
+          <span className="font-semibold text-slate-800">
+            {currentSop.authorName || currentSop.header.preparedBy.name || 'Biplob'}
+          </span>
+          {currentSop.header.preparedBy.signatureImg ? (
+            <span className="text-[9.5px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-1 py-0.2 rounded font-bold">
+              ✓ স্বাক্ষরিত
+            </span>
+          ) : (
+            <span className="text-[9.5px] bg-amber-100 text-amber-800 px-1 py-0.2 rounded font-medium">
+              ড্রাফট
+            </span>
           )}
         </div>
 
-        <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+        <span className="text-slate-400 font-bold text-xs select-none">→</span>
 
         {/* Step 2: Checked By */}
         <div
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl font-medium transition ${
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition border ${
             status === 'forwarded_to_checker'
-              ? 'bg-blue-100 text-blue-900 border border-blue-400 shadow-xs font-bold animate-pulse'
+              ? 'bg-blue-50 text-blue-950 border-blue-400 shadow-xs font-bold ring-1 ring-blue-300 animate-pulse'
               : status === 'forwarded_to_approver' || status === 'approved'
-              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-              : 'bg-slate-100 text-slate-600 border border-slate-200'
+              ? 'bg-white text-slate-700 border-slate-200 shadow-2xs'
+              : 'bg-slate-100/80 text-slate-400 border-slate-200'
           }`}
+          title="পর্যালোচক (Section In-Charge)"
         >
-          <span className="w-4 h-4 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold">
+          <span
+            className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${
+              status === 'forwarded_to_checker' ? 'bg-blue-600' : 'bg-slate-400'
+            }`}
+          >
             ২
           </span>
-          <span>
-            পর্যালোচনা (Section In charge): <strong>{currentSop.checkedByName || currentSop.header.checkedBy.name || 'Sazzad'}</strong>
+          <span className="hidden md:inline text-slate-500 font-normal">পর্যালোচনা:</span>
+          <span className="font-semibold text-slate-800">
+            {currentSop.checkedByName || currentSop.header.checkedBy.name || 'Sazzad'}
           </span>
-          {status === 'forwarded_to_checker' && (
-            <span className="text-[9px] bg-blue-200 text-blue-900 px-1 rounded font-bold">Pending</span>
-          )}
-          {currentSop.header.checkedBy.signatureImg && (
-            <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1 rounded font-bold">Signed</span>
-          )}
+          {status === 'forwarded_to_checker' ? (
+            <span className="text-[9.5px] bg-blue-100 text-blue-800 border border-blue-300 px-1 py-0.2 rounded font-bold">
+              পেন্ডিং
+            </span>
+          ) : currentSop.header.checkedBy.signatureImg ? (
+            <span className="text-[9.5px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-1 py-0.2 rounded font-bold">
+              ✓ স্বাক্ষরিত
+            </span>
+          ) : null}
         </div>
 
-        <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+        <span className="text-slate-400 font-bold text-xs select-none">→</span>
 
         {/* Step 3: Approved By */}
         <div
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl font-medium transition ${
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition border ${
             status === 'approved'
-              ? 'bg-emerald-100 text-emerald-900 border border-emerald-400 shadow-xs font-bold'
+              ? 'bg-emerald-50 text-emerald-950 border-emerald-400 shadow-xs font-bold ring-1 ring-emerald-300'
               : status === 'forwarded_to_approver'
-              ? 'bg-purple-100 text-purple-900 border border-purple-400 shadow-xs font-bold animate-pulse'
-              : 'bg-slate-100 text-slate-600 border border-slate-200'
+              ? 'bg-purple-50 text-purple-950 border-purple-400 shadow-xs font-bold ring-1 ring-purple-300 animate-pulse'
+              : 'bg-slate-100/80 text-slate-400 border-slate-200'
           }`}
+          title="অনুমোদনকারী (Process HOD)"
         >
-          <span className="w-4 h-4 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px] font-bold">
+          <span
+            className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${
+              status === 'approved'
+                ? 'bg-emerald-600'
+                : status === 'forwarded_to_approver'
+                ? 'bg-purple-600'
+                : 'bg-slate-400'
+            }`}
+          >
             ৩
           </span>
-          <span>
-            অনুমোদন (Process HOD): <strong>{currentSop.approvedByName || currentSop.header.approvedBy.name || 'Kamrul (44819)'}</strong>
+          <span className="hidden md:inline text-slate-500 font-normal">অনুমোদন:</span>
+          <span className="font-semibold text-slate-800">
+            {currentSop.approvedByName || currentSop.header.approvedBy.name || 'Kamrul (44819)'}
           </span>
           {status === 'approved' ? (
-            <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded-full font-bold flex items-center gap-0.5">
+            <span className="text-[9.5px] bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded-full font-bold flex items-center gap-0.5">
               <CheckCheck className="w-3 h-3" /> Approved
             </span>
           ) : status === 'forwarded_to_approver' ? (
-            <span className="text-[9px] bg-purple-200 text-purple-900 px-1 rounded font-bold">Pending</span>
+            <span className="text-[9.5px] bg-purple-100 text-purple-800 border border-purple-300 px-1 py-0.2 rounded font-bold">
+              পেন্ডিং
+            </span>
           ) : null}
         </div>
       </div>
 
-      {/* Right: Role-based Action Buttons */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {/* Save to Personal Archive (Always available) */}
+      {/* Right: Context-Aware Smart Actions & Admin Control Center */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        {/* Save to Archive */}
         <button
           type="button"
           onClick={handleSaveArchive}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl font-semibold transition cursor-pointer"
-          title="আর্কাইভে সেভ করুন"
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold shadow-2xs transition cursor-pointer active:scale-95"
+          title="বর্তমান অবস্থা আর্কাইভে সেভ করুন"
         >
           <Archive className="w-3.5 h-3.5 text-slate-500" />
-          <span>আর্কাইভে সেভ</span>
+          <span className="hidden sm:inline">আর্কাইভে সেভ</span>
         </button>
 
-        {/* Guest / Not logged in banner */}
+        {/* Guest prompt */}
         {!currentUser && (
           <button
             type="button"
             onClick={onOpenLogin}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-xs transition cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold shadow-xs transition cursor-pointer"
           >
-            <span>লগইন করে ফরোয়ার্ড করুন</span>
+            <span>লগইন করে ওয়ার্কফ্লো শুরু করুন</span>
           </button>
         )}
 
-        {/* Actions for Prepared By (Biplob, Dev, Admin) */}
-        {currentUser && (currentUser.role === 'prepared_by' || currentUser.role === 'admin') && (
+        {/* 1. Primary Action for Stage 1: DRAFT or REJECTED */}
+        {currentUser && (status === 'draft' || status === 'rejected') && isAuthor && (
           <>
             <button
               type="button"
               onClick={() => openSignDialog('preparedBy')}
-              className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl font-semibold transition cursor-pointer"
-              title="Prepared By স্বাক্ষর যোগ করুন"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition cursor-pointer"
+              title="Prepared By স্বাক্ষর সংযুক্ত করুন"
             >
               <FileSignature className="w-3.5 h-3.5 text-blue-600" />
               <span>স্বাক্ষর ({currentSop.header.preparedBy.signatureImg ? 'সংযুক্ত' : 'আপলোড'})</span>
@@ -315,7 +362,7 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
             <button
               type="button"
               onClick={() => setIsForwardModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-xs transition cursor-pointer active:scale-95"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold shadow-xs transition cursor-pointer active:scale-95"
             >
               <Send className="w-3.5 h-3.5" />
               <span>উচ্চপদস্থ পর্যালোচনায় পাঠান</span>
@@ -323,13 +370,13 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
           </>
         )}
 
-        {/* Actions for Checked By (Sazzad, Rafi, Hashmi, Pear, Emon, Admin) */}
-        {currentUser && (currentUser.role === 'checked_by' || currentUser.role === 'admin') && (
+        {/* 2. Primary Action for Stage 2: FORWARDED TO CHECKER */}
+        {currentUser && status === 'forwarded_to_checker' && isChecker && (
           <>
             <button
               type="button"
               onClick={() => openSignDialog('checkedBy')}
-              className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl font-semibold transition cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition cursor-pointer"
               title="Checked By স্বাক্ষর যোগ করুন"
             >
               <FileSignature className="w-3.5 h-3.5 text-blue-600" />
@@ -339,7 +386,7 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
             <button
               type="button"
               onClick={handleConfirmForwardApprover}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-xs transition cursor-pointer active:scale-95"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold shadow-xs transition cursor-pointer active:scale-95"
             >
               <Send className="w-3.5 h-3.5" />
               <span>অনুমোদনে পাঠান (Kamrul)</span>
@@ -348,7 +395,7 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
             <button
               type="button"
               onClick={() => setIsRejectModalOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl font-semibold transition cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold transition cursor-pointer"
               title="সংশোধনের জন্য ফেরত দিন"
             >
               <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
@@ -357,13 +404,13 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
           </>
         )}
 
-        {/* Actions for Approved By (Kamrul, Admin) */}
-        {currentUser && (currentUser.role === 'approved_by' || currentUser.role === 'admin') && (
+        {/* 3. Primary Action for Stage 3: FORWARDED TO APPROVER */}
+        {currentUser && status === 'forwarded_to_approver' && isApprover && (
           <>
             <button
               type="button"
               onClick={() => openSignDialog('approvedBy')}
-              className="flex items-center gap-1 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl font-semibold transition cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition cursor-pointer"
               title="Approved By স্বাক্ষর যোগ করুন"
             >
               <FileSignature className="w-3.5 h-3.5 text-purple-600" />
@@ -373,7 +420,7 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
             <button
               type="button"
               onClick={handleConfirmApproval}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-sm transition cursor-pointer active:scale-95"
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold shadow-xs transition cursor-pointer active:scale-95"
             >
               <ShieldCheck className="w-4 h-4" />
               <span>চূড়ান্ত অনুমোদন ও প্রকাশ</span>
@@ -382,7 +429,7 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
             <button
               type="button"
               onClick={() => setIsRejectModalOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl font-semibold transition cursor-pointer"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold transition cursor-pointer"
               title="সংশোধনের জন্য ফেরত দিন"
             >
               <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
@@ -391,45 +438,137 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
           </>
         )}
 
-        {/* Create New SOP button (Available for everyone) */}
-        {onNewSop && (
-          <button
-            type="button"
-            onClick={onNewSop}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500 rounded-xl font-bold transition cursor-pointer shadow-xs active:scale-95"
-            title="নতুন সম্পূর্ণ ব্ল্যাঙ্ক SOP তৈরি করুন"
-          >
-            <FilePlus className="w-3.5 h-3.5" />
-            <span>+ নতুন SOP</span>
-          </button>
+        {/* 4. State: APPROVED */}
+        {status === 'approved' && (
+          <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-lg font-bold text-xs shadow-2xs">
+            <ShieldCheck className="w-4 h-4 text-emerald-700" />
+            <span>চূড়ান্ত অনুমোদিত ও প্রকাশিত</span>
+          </div>
         )}
 
-        {/* Reset SOP content button (Available for everyone) */}
-        {onResetSop && (
-          <button
-            type="button"
-            onClick={onResetSop}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl font-bold transition cursor-pointer shadow-xs"
-            title="বর্তমান SOP-এর সব ফিল্ড ও ছবি রিসেট করে খালি করুন"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
-            <span>রিসেট</span>
-          </button>
+        {/* 5. ADMIN OVERRIDE DROPDOWN: High-density control replacing 10 messy buttons */}
+        {isAdmin && (
+          <div className="relative" ref={adminMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsAdminMenuOpen(!isAdminMenuOpen)}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold transition cursor-pointer shadow-xs active:scale-95"
+              title="অ্যাডমিন কন্ট্রোল ও ওভাররাইড মেনু"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden md:inline">অ্যাডমিন অ্যাকশন</span>
+              <span className="text-[10px]">▼</span>
+            </button>
+
+            {isAdminMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white text-slate-900 rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100 text-xs">
+                <div className="p-2.5 bg-slate-900 text-white font-bold text-xs flex items-center justify-between">
+                  <span>অ্যাডমিন স্পেশাল ওভাররাইড</span>
+                  <span className="text-[9px] bg-rose-600 px-1.5 py-0.5 rounded font-mono">ALL ACCESS</span>
+                </div>
+                <div className="p-1 divide-y divide-slate-100">
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openSignDialog('preparedBy');
+                        setIsAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-slate-50 rounded flex items-center gap-2 text-slate-700 cursor-pointer"
+                    >
+                      <FileSignature className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Prepared By স্বাক্ষর পরিবর্তন</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openSignDialog('checkedBy');
+                        setIsAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-slate-50 rounded flex items-center gap-2 text-slate-700 cursor-pointer"
+                    >
+                      <FileSignature className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Checked By স্বাক্ষর পরিবর্তন</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openSignDialog('approvedBy');
+                        setIsAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-slate-50 rounded flex items-center gap-2 text-slate-700 cursor-pointer"
+                    >
+                      <FileSignature className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Approved By স্বাক্ষর পরিবর্তন</span>
+                    </button>
+                  </div>
+                  <div className="py-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsForwardModalOpen(true);
+                        setIsAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-blue-50 text-blue-700 rounded flex items-center gap-2 cursor-pointer font-medium"
+                    >
+                      <Send className="w-3.5 h-3.5 text-blue-600" />
+                      <span>উচ্চপদস্থ পর্যালোচনায় পাঠান</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleConfirmForwardApprover();
+                        setIsAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-indigo-50 text-indigo-700 rounded flex items-center gap-2 cursor-pointer font-medium"
+                    >
+                      <Send className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>অনুমোদনে পাঠান (Kamrul)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleConfirmApproval();
+                        setIsAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-emerald-50 text-emerald-800 rounded flex items-center gap-2 cursor-pointer font-bold"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>সরাসরি চূড়ান্ত অনুমোদন প্রদান</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRejectModalOpen(true);
+                        setIsAdminMenuOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-rose-50 text-rose-700 rounded flex items-center gap-2 cursor-pointer font-medium"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+                      <span>সংশোধনে ফেরত দিন</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
-        {/* Personal Workspace button */}
+        {/* My Workspace Link Button */}
         <button
           type="button"
           onClick={onOpenWorkspace}
-          className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl font-bold transition cursor-pointer"
+          className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1 active:scale-95"
+          title="আমার তৈরি করা ও অ্যাসাইনকৃত SOP তালিকা"
         >
-          <span>আমার ওয়ার্কস্পেস</span>
+          <FolderArchive className="w-3.5 h-3.5 text-blue-600" />
+          <span className="hidden sm:inline">ওয়ার্কস্পেস</span>
         </button>
       </div>
 
       {/* ==================== MODALS MOUNTED VIA PORTAL ==================== */}
 
-      {/* MODAL 1: Forward to Checker Dialog (Rendered in document.body) */}
+      {/* MODAL 1: Forward to Checker Dialog */}
       {isForwardModalOpen &&
         typeof document !== 'undefined' &&
         createPortal(
@@ -491,7 +630,7 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
           document.body
         )}
 
-      {/* MODAL 2: Signature Upload Dialog (Rendered in document.body) */}
+      {/* MODAL 2: Signature Upload Dialog */}
       {isSignModalOpen &&
         typeof document !== 'undefined' &&
         createPortal(
@@ -516,7 +655,6 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
               </div>
 
               <div className="space-y-3">
-                {/* Preview */}
                 {signInput ? (
                   <div className="h-28 bg-slate-50 border-2 border-dashed border-emerald-300 rounded-xl p-2 flex items-center justify-center relative">
                     <img src={signInput} alt="Signature Preview" className="max-h-full max-w-full object-contain" />
@@ -563,7 +701,7 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
           document.body
         )}
 
-      {/* MODAL 3: Reject / Revision Request Dialog (Rendered in document.body) */}
+      {/* MODAL 3: Reject / Revision Request Dialog */}
       {isRejectModalOpen &&
         typeof document !== 'undefined' &&
         createPortal(
