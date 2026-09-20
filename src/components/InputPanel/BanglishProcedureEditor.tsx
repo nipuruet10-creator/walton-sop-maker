@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { SOPProcedure } from '../../types/sop';
 import { toBengaliNumber } from '../../data/defaultSopData';
 import { offlineConvertBanglish } from '../../services/banglishEngine';
-import { Sparkles, Plus, Trash2, HelpCircle, CheckCircle2, Zap, BookmarkCheck, Cpu, Type } from 'lucide-react';
+import { Sparkles, Plus, Trash2, HelpCircle, CheckCircle2, Zap, Cpu, Type } from 'lucide-react';
 
 interface BanglishProcedureEditorProps {
   procedure: SOPProcedure;
@@ -20,25 +20,6 @@ interface BanglishProcedureEditorProps {
   qualityFontSize?: 'auto' | 'compact' | 'normal' | 'large';
   onQualityFontSizeChange?: (size: 'auto' | 'compact' | 'normal' | 'large') => void;
 }
-
-const PRESET_TEMPLATES = [
-  {
-    title: 'Walton Cassette IDU (টেপিং)',
-    text: `1) prothome Packaging Tape Dispenser theke 200 mm lomba BOPP tape kete nite hobe. sothik vabe lagay nite hobe.
-2) Cassette indoor cartoon er chihnito sthane shothikbhabe tepti boshate hobe (chobi-1).
-3) indoor cartoon er every ta taping jaygay ek layer BOPP tape use korte hobe (chobi-2).
-4) chobi-3 onujayi Cassette indoor cartoon er nicher dike BOPP tape use korte hobe.
-5) chobi-4 e dekhano onujayi, cartoon er ubhoy pashe 4 ti kore mot 8 ti nirdishto sthane BOPP tape use korte hobe.
-6) chobi-5 onusare PET belt machine e 3 setting kore cartoone shothikbabe belt dite hobe.`,
-  },
-  {
-    title: 'Refrigerator (ডোর গ্যাসকেট)',
-    text: `1) prothome Refrigerator door groove valo vabe clean kore nite hobe.
-2) Rubber gasket er char corner chihnito sthane thikbhabe press kore boshate hobe (chobi-1).
-3) door er char pashe gasket e uniform gap check korte hobe (chobi-2).
-4) door close kore magnetic seal thik ase kina inspection korte hobe (chobi-3).`,
-  },
-];
 
 export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = ({
   procedure,
@@ -140,10 +121,6 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
     onChange({ ...procedure, generalInstructions: updated });
   };
 
-  const applyPreset = (presetText: string) => {
-    handleBanglishChange(presetText);
-  };
-
   return (
     <div className="space-y-4 text-xs">
       {/* Banglish Input Box */}
@@ -172,7 +149,7 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
                     ? activeProvider === 'openrouter'
                       ? `AI: ${activeModel.replace(':free', '').split('/').pop()}`
                       : 'Gemini AI'
-                    : 'বাংলা ইঞ্জিন (Setup AI)'}
+                    : 'সেন্ট্রাল AI সেটিংস'}
                 </span>
               </button>
             ) : (
@@ -196,22 +173,6 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
               <span>{autoConvert ? 'Auto-Translate ON' : 'Auto-Translate OFF'}</span>
             </button>
           </div>
-        </div>
-
-        {/* Quick Sample Presets */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-          <span className="text-[10px] text-slate-400 shrink-0">স্যাম্পল টেমপ্লেট:</span>
-          {PRESET_TEMPLATES.map((tmpl, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => applyPreset(tmpl.text)}
-              className="text-[10px] bg-slate-800 hover:bg-slate-700 text-blue-300 px-2 py-0.5 rounded whitespace-nowrap transition cursor-pointer flex items-center gap-1 border border-slate-700"
-            >
-              <BookmarkCheck className="w-2.5 h-2.5" />
-              <span>{tmpl.title}</span>
-            </button>
-          ))}
         </div>
 
         <textarea
@@ -371,19 +332,6 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>Banglish Input (লক্ষণীয় বিষয় AI Generator)</span>
             </label>
-            <button
-              type="button"
-              onClick={() => {
-                const sample = `1) belt laganor somoy nissit korte hobe jate cartoon chire na jay (chobi-6).
-2) tape boshonor somoy kheyal rakhte hobe jate tape baka na hoy ebong sojasuji thake.
-3) protiti jaygay 1 layer tape shothikbhabe deya hoyese kina check korte hobe.`;
-                onChange({ ...procedure, qualityBanglishInput: sample });
-              }}
-              className="text-[10px] bg-slate-800 hover:bg-slate-700 text-amber-300 px-2 py-0.5 rounded border border-slate-700 transition cursor-pointer flex items-center gap-1"
-            >
-              <BookmarkCheck className="w-2.5 h-2.5" />
-              <span>স্যাম্পল দিন</span>
-            </button>
           </div>
 
           <textarea

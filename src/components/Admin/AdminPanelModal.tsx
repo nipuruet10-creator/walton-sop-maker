@@ -9,7 +9,16 @@ import {
   addUser,
   updateUserProfile,
   deleteUser,
+  getGlobalAiConfig,
+  saveGlobalAiConfig,
+  type GlobalAiConfig,
 } from '../../services/storageService';
+import {
+  testOpenRouterKey,
+  fetchFreeOpenRouterModels,
+  DEFAULT_FREE_MODELS,
+  type OpenRouterModel,
+} from '../../services/openrouterService';
 import {
   ShieldAlert,
   Users,
@@ -23,6 +32,14 @@ import {
   Workflow,
   Search,
   UserPlus,
+  Sparkles,
+  Cpu,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  CheckCircle2,
+  AlertCircle,
+  ExternalLink,
 } from 'lucide-react';
 
 interface AdminPanelModalProps {
@@ -32,7 +49,7 @@ interface AdminPanelModalProps {
 }
 
 export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClose, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'routing' | 'users' | 'backup'>('routing');
+  const [activeTab, setActiveTab] = useState<'routing' | 'ai' | 'users' | 'backup'>('routing');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [selectedUserForReset, setSelectedUserForReset] = useState<UserProfile | null>(null);
   const [newPassword, setNewPassword] = useState<string>('');
@@ -42,18 +59,29 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [levelFilter, setLevelFilter] = useState<'all' | 'prepared_by' | 'checked_by' | 'approved_by'>('all');
 
+  // AI Configuration State
+  const [aiConfig, setAiConfig] = useState<GlobalAiConfig>(getGlobalAiConfig);
+  const [showOrKey, setShowOrKey] = useState<boolean>(false);
+  const [showGemKey, setShowGemKey] = useState<boolean>(false);
+  const [isTestingAi, setIsTestingAi] = useState<boolean>(false);
+  const [aiTestResult, setAiTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [models, setModels] = useState<OpenRouterModel[]>(DEFAULT_FREE_MODELS);
+  const [isFetchingModels, setIsFetchingModels] = useState<boolean>(false);
+
   // Add Approver Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [newUserId, setNewUserId] = useState<string>('');
+  const [newUserEmpId, setNewUserEmpId] = useState<string>('');
   const [newUserName, setNewUserName] = useState<string>('');
   const [newUserRole, setNewUserRole] = useState<UserRole>('checked_by');
   const [newUserDesignation, setNewUserDesignation] = useState<string>('');
-  const [newUserDepartment, setNewUserDepartment] = useState<string>('Process Automation');
+  const [newUserDepartment, setNewUserDepartment] = useState<string>('Process Development');
   const [newUserPassword, setNewUserPassword] = useState<string>('Process@2026');
 
   // Edit Approver Modal state
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [editName, setEditName] = useState<string>('');
+  const [editEmpId, setEditEmpId] = useState<string>('');
   const [editRole, setEditRole] = useState<UserRole>('checked_by');
   const [editDesignation, setEditDesignation] = useState<string>('');
   const [editDepartment, setEditDepartment] = useState<string>('');
@@ -66,6 +94,11 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
   useEffect(() => {
     if (isOpen) {
       fetchUsers();
+      const currentConfig = getGlobalAiConfig();
+      setAiConfig(currentConfig);
+      if (currentConfig.openRouterKey) {
+        handleFetchModels(currentConfig.openRouterKey);
+      }
     }
   }, [isOpen]);
 
@@ -82,7 +115,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
           <div>
             <h3 className="font-bold text-slate-900 text-sm">অ্যাক্সেস সংরক্ষিত (Access Denied)</h3>
             <p className="text-xs text-slate-500 mt-1">
-              এই সেটিং ও অনুমোদন প্যানেলে প্রবেশের অধিকার শুধুমাত্র অ্যাডমিন (ID: Sazzad, Pass: ACprocess@2026)-এর রয়েছে।
+              এই সেটিং ও অনুমোদন প্যানেলে প্রবেশের অধিকার শুধুমাত্র অ্যাডমিন (ID: Sazzad / 50463, Pass: ACprocess@2026)-এর রয়েছে।
             </p>
           </div>
           <button
@@ -103,6 +136,49 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
     setTimeout(() => setSuccessMsg(null), 4000);
   };
 
+  // AI Configuration Handlers
+  const handleFetchModels = async (keyToUse?: string) => {
+    setIsFetchingModels(true);
+    try {
+      const fetched = await fetchFreeOpenRouterModels(keyToUse || aiConfig.openRouterKey);
+      setModels(fetched);
+    } catch {
+      setModels(DEFAULT_FREE_MODELS);
+    } finally {
+      setIsFetchingModels(false);
+    }
+  };
+
+  const handleTestAiKey = async () => {
+    setIsTestingAi(true);
+    setAiTestResult(null);
+    try {
+      if (aiConfig.activeProvider === 'openrouter') {
+        const res = await testOpenRouterKey(aiConfig.openRouterKey);
+        setAiTestResult(res);
+        if (res.success) {
+          handleFetchModels(aiConfig.openRouterKey);
+        }
+      } else {
+        if (!aiConfig.geminiKey.trim()) {
+          setAiTestResult({ success: false, message: 'Gemini API Key খালি রাখা যাবে না।' });
+        } else {
+          setAiTestResult({ success: true, message: '✅ Gemini API Key সংরক্ষিত হয়েছে।' });
+        }
+      }
+    } catch (e: any) {
+      setAiTestResult({ success: false, message: 'টেস্ট ব্যর্থ: ' + e.message });
+    } finally {
+      setIsTestingAi(false);
+    }
+  };
+
+  const handleSaveAiConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveGlobalAiConfig(aiConfig);
+    showNotification('সেন্ট্রাল AI ইঞ্জিন কনফিগারেশন সফলভাবে সেভ হয়েছে! সকল ইঞ্জিনিয়ার এখন থেকে এই API ব্যবহার করতে পারবেন।');
+  };
+
   // Add User / Approver Handler
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,11 +197,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
     const newUser: UserProfile = {
       id: cleanId,
+      employeeId: newUserEmpId.trim() || undefined,
       username: cleanId,
       name: cleanName,
       role: newUserRole,
       designation: newUserDesignation.trim() || 'Officer / Engineer',
-      department: newUserDepartment.trim() || 'Process Automation',
+      department: newUserDepartment.trim() || 'Process Development',
       passwordHash: newUserPassword.trim() || 'Process@2026',
       createdAt: new Date().toISOString(),
     };
@@ -135,9 +212,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
       showNotification(`অনুমোদনকারী "${cleanName}" (${cleanId}) সফলভাবে যুক্ত করা হয়েছে!`);
       setIsAddModalOpen(false);
       setNewUserId('');
+      setNewUserEmpId('');
       setNewUserName('');
       setNewUserDesignation('');
-      setNewUserDepartment('Process Automation');
+      setNewUserDepartment('Process Development');
       setNewUserPassword('Process@2026');
       await fetchUsers();
     } else {
@@ -149,6 +227,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
   const handleOpenEdit = (user: UserProfile) => {
     setEditingUser(user);
     setEditName(user.name);
+    setEditEmpId(user.employeeId || '');
     setEditRole(user.role);
     setEditDesignation(user.designation);
     setEditDepartment(user.department);
@@ -162,6 +241,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
     const updatedUser: UserProfile = {
       ...editingUser,
       name: editName.trim() || editingUser.name,
+      employeeId: editEmpId.trim() || undefined,
       role: editRole,
       designation: editDesignation.trim() || editingUser.designation,
       department: editDepartment.trim() || editingUser.department,
@@ -179,7 +259,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
   // Delete User / Approver Handler
   const handleDeleteUser = async (user: UserProfile) => {
-    if (user.id === 'Admin_Sazzad' || user.id === 'Sazzad' && user.role === 'admin') {
+    if (user.id === 'Admin_Sazzad' || (user.id === 'Sazzad' && user.role === 'admin')) {
       alert('সিস্টেম সুপার অ্যাডমিন আইডি মুছে ফেলা যাবে না!');
       return;
     }
@@ -256,6 +336,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
       !searchQuery.trim() ||
       u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (u.employeeId && u.employeeId.includes(searchQuery)) ||
       u.designation.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.department.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesLevel && matchesSearch;
@@ -278,11 +359,11 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold tracking-tight">System Admin & Governance Panel</h2>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/25 text-rose-300 border border-rose-500/30">
-                  Super Admin: Sazzad
+                  Super Admin: Sazzad (50463)
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                অনুমোদন রুট ও সিকোয়েন্স কনফিগারেশন, ইউজার ও পাসওয়ার্ড ব্যবস্থাপনা, ব্যাকআপ
+                অনুমোদন রুট ও সিকোয়েন্স, গ্লোবাল AI ইঞ্জিন, ইউজার কন্ট্রোল ও ব্যাকআপ
               </p>
             </div>
           </div>
@@ -297,38 +378,51 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
         </div>
 
         {/* Tabs Bar */}
-        <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2">
+        <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 overflow-x-auto">
             <button
               type="button"
               onClick={() => setActiveTab('routing')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'routing'
                   ? 'bg-rose-800 text-white shadow-xs'
                   : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
               }`}
             >
               <Workflow className="w-3.5 h-3.5" />
-              <span>অনুমোদন রুট ও সিকোয়েন্স সেটিংস</span>
+              <span>অনুমোদন রুট ও সিকোয়েন্স</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('ai')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer whitespace-nowrap ${
+                activeTab === 'ai'
+                  ? 'bg-rose-800 text-white shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>সেন্ট্রাল AI ইঞ্জিন সেটিংস</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('users')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'users'
                   ? 'bg-rose-800 text-white shadow-xs'
                   : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
               }`}
             >
               <Users className="w-3.5 h-3.5" />
-              <span>ইউজার তালিকা ও পাসওয়ার্ড ({users.length})</span>
+              <span>ইউজার ও পাসওয়ার্ড ({users.length})</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('backup')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer whitespace-nowrap ${
                 activeTab === 'backup'
                   ? 'bg-rose-800 text-white shadow-xs'
                   : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
@@ -370,16 +464,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     className="flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
-                    <span>নতুন অনুমোদনকারী যুক্ত করুন</span>
+                    <span>নতুন কর্মকর্তা যুক্ত করুন</span>
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {/* Step 1: Prepared By */}
+                  {/* Step 1: Prepared By - Process concern */}
                   <div className="bg-slate-50 border border-emerald-200 rounded-xl p-3.5 relative">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        ধাপ ১: প্রস্তুতকারী (Prepared By)
+                        ধাপ ১: প্রস্তুতকারী (Process concern)
                       </span>
                       <span className="text-xs font-mono font-bold text-slate-500">
                         {preparedByUsers.length} জন
@@ -387,7 +481,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     </div>
                     <h4 className="text-xs font-bold text-slate-900 mt-2">প্রসেস ইঞ্জিনিয়ার ও ক্রিয়েটর</h4>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      বাংলিশ থেকে খাঁটি বাংলা এসওপি ড্রাফট, ছবি চিহ্নিতকরণ ও সাইন দিয়ে লেভেল ২-এ ফরোয়ার্ড করেন।
+                      বাংলিশ থেকে শুদ্ধ বাংলা এসওপি ড্রাফট, ছবি চিহ্নিতকরণ ও সাইন দিয়ে লেভেল ২-এ ফরোয়ার্ড করেন।
                     </p>
                     <div className="mt-2.5 flex flex-wrap gap-1">
                       {preparedByUsers.map((u) => (
@@ -395,17 +489,17 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                           key={u.id}
                           className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-700"
                         >
-                          {u.name.split(' ')[0]} ({u.id})
+                          {u.name}
                         </span>
                       ))}
                     </div>
                   </div>
 
-                  {/* Step 2: Checked By */}
+                  {/* Step 2: Checked By - Section In charge */}
                   <div className="bg-slate-50 border border-blue-200 rounded-xl p-3.5 relative">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
-                        ধাপ ২: পর্যালোচক (Checked By)
+                        ধাপ ২: পর্যালোচক (Section In charge)
                       </span>
                       <span className="text-xs font-mono font-bold text-slate-500">
                         {checkedByUsers.length} জন
@@ -421,17 +515,17 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                           key={u.id}
                           className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-700"
                         >
-                          {u.name.split(' ')[0]} ({u.id})
+                          {u.name}
                         </span>
                       ))}
                     </div>
                   </div>
 
-                  {/* Step 3: Approved By */}
+                  {/* Step 3: Approved By - Process HOD */}
                   <div className="bg-slate-50 border border-purple-200 rounded-xl p-3.5 relative">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
-                        ধাপ ৩: অনুমোদনকারী (Approved By)
+                        ধাপ ৩: অনুমোদনকারী (Process HOD)
                       </span>
                       <span className="text-xs font-mono font-bold text-slate-500">
                         {approvedByUsers.length} জন
@@ -447,7 +541,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                           key={u.id}
                           className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-white border border-slate-200 text-slate-700"
                         >
-                          {u.name.split(' ')[0]} ({u.id})
+                          {u.name}
                         </span>
                       ))}
                     </div>
@@ -477,7 +571,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                           levelFilter === 'prepared_by' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        ১. প্রস্তুতকারী ({preparedByUsers.length})
+                        ১. Process concern ({preparedByUsers.length})
                       </button>
                       <button
                         type="button"
@@ -486,7 +580,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                           levelFilter === 'checked_by' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        ২. পর্যালোচক ({checkedByUsers.length})
+                        ২. Section In charge ({checkedByUsers.length})
                       </button>
                       <button
                         type="button"
@@ -495,7 +589,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                           levelFilter === 'approved_by' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        ৩. অনুমোদনকারী ({approvedByUsers.length})
+                        ৩. Process HOD ({approvedByUsers.length})
                       </button>
                     </div>
                   </div>
@@ -507,7 +601,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="নাম, পদবী বা আইডি দিয়ে খুঁজুন..."
+                      placeholder="নাম, পদবী, আইডি দিয়ে খুঁজুন..."
                       className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-rose-600"
                     />
                   </div>
@@ -528,10 +622,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                               <h4 className="font-bold text-xs text-slate-900 flex items-center gap-1.5">
                                 <span>{u.name}</span>
                                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
-                                  {u.id}
+                                  ID: {u.id}
                                 </span>
                               </h4>
-                              <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                              <p className="text-[11px] text-slate-600 mt-0.5 font-medium">
                                 {u.designation}
                               </p>
                               <p className="text-[10px] text-slate-400">
@@ -553,10 +647,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                               {u.role === 'admin'
                                 ? 'অ্যাডমিন'
                                 : u.role === 'approved_by'
-                                ? '৩. অনুমোদন'
+                                ? '৩. Process HOD'
                                 : u.role === 'checked_by'
-                                ? '২. পর্যালোচনা'
-                                : '১. প্রস্তুতকারী'}
+                                ? '২. Section In charge'
+                                : '১. Process concern'}
                             </span>
                           </div>
                         </div>
@@ -597,7 +691,210 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
             </div>
           )}
 
-          {/* TAB 2: USER LIST & PASSWORD RECOVERY */}
+          {/* TAB 2: CENTRAL GLOBAL AI CONFIGURATION */}
+          {activeTab === 'ai' && (
+            <div className="space-y-4 max-w-2xl mx-auto py-2">
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-5">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900">সেন্ট্রাল AI ইঞ্জিন কনফিগারেশন</h3>
+                      <p className="text-xs text-slate-500">
+                        এখানে একবার API Key সেভ করলে সকল ইউজার এর মাধ্যমে বাংলিশ থেকে বাংলা SOP তৈরি করতে পারবেন।
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong>অ্যাডমিন নির্দেশিকা:</strong> এই প্যানেলে আপনি যে API Key এবং মডেল সিলেক্ট করবেন, তা সমগ্র সিস্টেমের জন্য প্রযোজ্য হবে। কোনো ব্যবহারকারীকে আলাদা করে তাদের ব্যক্তিগত API Key দিতে হবে না। রিমুভ না করা পর্যন্ত এটি সক্রিয় থাকবে।
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveAiConfig} className="space-y-4">
+                  {/* Provider Switcher */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                      AI প্রোভাইডার সিলেক্ট করুন
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAiConfig((prev) => ({ ...prev, activeProvider: 'openrouter' }))}
+                        className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                          aiConfig.activeProvider === 'openrouter'
+                            ? 'bg-blue-50 border-blue-500 text-blue-800 shadow-xs'
+                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Cpu className="w-4 h-4 text-blue-600" />
+                        <span>OpenRouter AI (ফ্রি ও পেইড মডেল)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAiConfig((prev) => ({ ...prev, activeProvider: 'gemini' }))}
+                        className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer ${
+                          aiConfig.activeProvider === 'gemini'
+                            ? 'bg-blue-50 border-blue-500 text-blue-800 shadow-xs'
+                            : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Sparkles className="w-4 h-4 text-indigo-600" />
+                        <span>Google Gemini AI</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* OpenRouter Section */}
+                  {aiConfig.activeProvider === 'openrouter' && (
+                    <div className="space-y-3 pt-2">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-bold text-slate-700">OpenRouter API Key *</label>
+                          <a
+                            href="https://openrouter.ai/keys"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <span>ফ্রি Key তৈরি করুন</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={showOrKey ? 'text' : 'password'}
+                            value={aiConfig.openRouterKey}
+                            onChange={(e) =>
+                              setAiConfig((prev) => ({ ...prev, openRouterKey: e.target.value.trim() }))
+                            }
+                            placeholder="sk-or-v1-xxxxxxxxxxxxxxxxxxxx"
+                            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-600 font-mono pr-20"
+                          />
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setShowOrKey(!showOrKey)}
+                              className="p-1 text-slate-400 hover:text-slate-600"
+                            >
+                              {showOrKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleTestAiKey}
+                              disabled={isTestingAi || !aiConfig.openRouterKey}
+                              className="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold rounded-lg transition cursor-pointer disabled:opacity-50"
+                            >
+                              {isTestingAi ? 'টেস্ট হচ্ছে...' : 'টেস্ট'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Model Selector */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-bold text-slate-700">ডিফল্ট AI মডেল সিলেক্ট করুন</label>
+                          <button
+                            type="button"
+                            onClick={() => handleFetchModels()}
+                            disabled={isFetchingModels}
+                            className="text-[11px] text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            <RefreshCw className={`w-3 h-3 ${isFetchingModels ? 'animate-spin' : ''}`} />
+                            <span>মডেল রিফ্রেশ</span>
+                          </button>
+                        </div>
+                        <select
+                          value={aiConfig.openRouterModel}
+                          onChange={(e) => setAiConfig((prev) => ({ ...prev, openRouterModel: e.target.value }))}
+                          className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-600 font-medium"
+                        >
+                          {models.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name} {m.isFree ? '(FREE)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Gemini Section */}
+                  {aiConfig.activeProvider === 'gemini' && (
+                    <div className="space-y-3 pt-2">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-bold text-slate-700">Google Gemini API Key *</label>
+                          <a
+                            href="https://aistudio.google.com/app/apikey"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] text-blue-600 hover:underline flex items-center gap-1"
+                          >
+                            <span>ফ্রি Gemini Key তৈরি করুন</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                        <div className="relative">
+                          <input
+                            type={showGemKey ? 'text' : 'password'}
+                            value={aiConfig.geminiKey}
+                            onChange={(e) => setAiConfig((prev) => ({ ...prev, geminiKey: e.target.value.trim() }))}
+                            placeholder="AIzaSyxxxxxxxxxxxxxxxxxxxx"
+                            className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-600 font-mono pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowGemKey(!showGemKey)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            {showGemKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Test Result alert */}
+                  {aiTestResult && (
+                    <div
+                      className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+                        aiTestResult.success
+                          ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                          : 'bg-rose-50 border border-rose-200 text-rose-800'
+                      }`}
+                    >
+                      {aiTestResult.success ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                      )}
+                      <span>{aiTestResult.message}</span>
+                    </div>
+                  )}
+
+                  <div className="pt-3 border-t border-slate-100 flex justify-end">
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-2 cursor-pointer"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>গ্লোবাল AI কনফিগারেশন সেভ করুন</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: USER LIST & PASSWORD RECOVERY */}
           {activeTab === 'users' && (
             <div className="space-y-4">
               <div className="bg-white rounded-xl p-3.5 border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
@@ -637,7 +934,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                             : 'bg-emerald-100 text-emerald-800'
                         }`}
                       >
-                        {u.role.replace('_', ' ').toUpperCase()}
+                        {u.role === 'admin'
+                          ? 'অ্যাডমিন'
+                          : u.role === 'approved_by'
+                          ? '৩. Process HOD'
+                          : u.role === 'checked_by'
+                          ? '২. Section In charge'
+                          : '১. Process concern'}
                       </span>
                     </div>
 
@@ -661,7 +964,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
             </div>
           )}
 
-          {/* TAB 3: MASTER BACKUP & RESTORE */}
+          {/* TAB 4: MASTER BACKUP & RESTORE */}
           {activeTab === 'backup' && (
             <div className="space-y-4 max-w-xl mx-auto py-6">
               <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
@@ -672,7 +975,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   <div>
                     <h3 className="text-sm font-bold text-slate-900">মাস্টার ডাটাবেজ ব্যাকআপ (Export JSON)</h3>
                     <p className="text-xs text-slate-500">
-                      সিস্টেমের সমস্ত ইউজার, পাসওয়ার্ড, অনুমোদন রুট এবং সংরক্ষিত SOP একটি JSON ফাইলে সেভ করুন।
+                      সিস্টেমের সমস্ত ইউজার, পাসওয়ার্ড, গ্লোবাল AI কি এবং সংরক্ষিত SOP একটি JSON ফাইলে সেভ করুন।
                     </p>
                   </div>
                 </div>
@@ -717,7 +1020,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               <div className="flex items-center justify-between border-b pb-2.5">
                 <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                   <UserPlus className="w-4 h-4 text-rose-700" />
-                  <span>নতুন অনুমোদনকারী / কর্মকর্তা যুক্ত করুন</span>
+                  <span>নতুন কর্মকর্তা যুক্ত করুন</span>
                 </h4>
                 <button
                   type="button"
@@ -737,8 +1040,21 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     type="text"
                     value={newUserId}
                     onChange={(e) => setNewUserId(e.target.value)}
-                    placeholder="যেমন: Tanvir, Anik, Shanto"
+                    placeholder="যেমন: Tanvir, Shanto"
                     required
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    এমপ্লয়ী আইডি (Walton ID)
+                  </label>
+                  <input
+                    type="text"
+                    value={newUserEmpId}
+                    onChange={(e) => setNewUserEmpId(e.target.value)}
+                    placeholder="যেমন: 54634, 67544"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600 font-mono"
                   />
                 </div>
@@ -766,9 +1082,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     onChange={(e) => setNewUserRole(e.target.value as UserRole)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600 font-semibold"
                   >
-                    <option value="prepared_by">ধাপ ১: প্রস্তুতকারী (Level 1: Prepared By - Engineer)</option>
-                    <option value="checked_by">ধাপ ২: পর্যালোচক (Level 2: Checked By - In-Charge)</option>
-                    <option value="approved_by">ধাপ ৩: চূড়ান্ত অনুমোদনকারী (Level 3: Approved By - Plant Head)</option>
+                    <option value="prepared_by">ধাপ ১: প্রস্তুতকারী (Process concern)</option>
+                    <option value="checked_by">ধাপ ২: পর্যালোচক (Section In charge)</option>
+                    <option value="approved_by">ধাপ ৩: চূড়ান্ত অনুমোদনকারী (Process HOD)</option>
                   </select>
                 </div>
 
@@ -780,7 +1096,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     type="text"
                     value={newUserDesignation}
                     onChange={(e) => setNewUserDesignation(e.target.value)}
-                    placeholder="যেমন: Process Engineer, Section In-Charge"
+                    placeholder="যেমন: Assistant Director, Process Engineer"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600"
                   />
                 </div>
@@ -793,7 +1109,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     type="text"
                     value={newUserDepartment}
                     onChange={(e) => setNewUserDepartment(e.target.value)}
-                    placeholder="যেমন: Process Automation, QA, Manufacturing"
+                    placeholder="যেমন: Process Development, QA"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600"
                   />
                 </div>
@@ -864,6 +1180,19 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
+                    এমপ্লয়ী আইডি (Walton ID)
+                  </label>
+                  <input
+                    type="text"
+                    value={editEmpId}
+                    onChange={(e) => setEditEmpId(e.target.value)}
+                    placeholder="যেমন: 54634, 67544"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
                     পূর্ণ নাম (Full Name) *
                   </label>
                   <input
@@ -884,9 +1213,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     onChange={(e) => setEditRole(e.target.value as UserRole)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600 font-semibold"
                   >
-                    <option value="prepared_by">ধাপ ১: প্রস্তুতকারী (Level 1: Prepared By - Engineer)</option>
-                    <option value="checked_by">ধাপ ২: পর্যালোচক (Level 2: Checked By - In-Charge)</option>
-                    <option value="approved_by">ধাপ ৩: চূড়ান্ত অনুমোদনকারী (Level 3: Approved By - Plant Head)</option>
+                    <option value="prepared_by">ধাপ ১: প্রস্তুতকারী (Process concern)</option>
+                    <option value="checked_by">ধাপ ২: পর্যালোচক (Section In charge)</option>
+                    <option value="approved_by">ধাপ ৩: চূড়ান্ত অনুমোদনকারী (Process HOD)</option>
                     <option value="admin">সুপার অ্যাডমিন (System Administrator)</option>
                   </select>
                 </div>

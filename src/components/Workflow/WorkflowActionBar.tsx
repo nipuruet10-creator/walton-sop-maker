@@ -199,7 +199,7 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
           <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold">
             ১
           </span>
-          <span>প্রস্তুত: <strong>{currentSop.authorName || currentSop.header.preparedBy.name || 'Biplob'}</strong></span>
+          <span>প্রস্তুত (Process concern): <strong>{currentSop.authorName || currentSop.header.preparedBy.name || 'Biplob'}</strong></span>
           {currentSop.header.preparedBy.signatureImg && (
             <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1 rounded font-bold">Signed</span>
           )}
@@ -221,7 +221,7 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
             ২
           </span>
           <span>
-            পর্যালোচনা: <strong>{currentSop.checkedByName || currentSop.header.checkedBy.name || 'Sazzad'}</strong>
+            পর্যালোচনা (Section In charge): <strong>{currentSop.checkedByName || currentSop.header.checkedBy.name || 'Sazzad'}</strong>
           </span>
           {status === 'forwarded_to_checker' && (
             <span className="text-[9px] bg-blue-200 text-blue-900 px-1 rounded font-bold">Pending</span>
@@ -247,7 +247,7 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
             ৩
           </span>
           <span>
-            অনুমোদন: <strong>Kamrul Hasan</strong>
+            অনুমোদন (Process HOD): <strong>{currentSop.approvedByName || currentSop.header.approvedBy.name || 'Kamrul (44819)'}</strong>
           </span>
           {status === 'approved' ? (
             <span className="text-[9px] bg-emerald-200 text-emerald-900 px-1.5 py-0.2 rounded-full font-bold flex items-center gap-0.5">

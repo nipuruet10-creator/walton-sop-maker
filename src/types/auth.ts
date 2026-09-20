@@ -2,6 +2,7 @@ export type UserRole = 'admin' | 'prepared_by' | 'checked_by' | 'approved_by' | 
 
 export interface UserProfile {
   id: string; // e.g. 'Biplob', 'Dev', 'Sazzad', 'Rafi', 'Hashmi', 'Pear', 'Emon', 'Kamrul'
+  employeeId?: string; // e.g. '67544', '54150', '50463'
   username: string; // login identifier
   name: string; // display name, e.g. 'Biplob Hossain'
   role: UserRole;

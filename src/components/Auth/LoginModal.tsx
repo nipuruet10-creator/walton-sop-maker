@@ -1,24 +1,29 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { UserProfile } from '../../types/auth';
-import { authenticateUser, INITIAL_USERS } from '../../services/storageService';
+import { authenticateUser } from '../../services/storageService';
 import {
   User,
   LogIn,
   KeyRound,
-  Building2,
   X,
-  Sparkles,
   AlertCircle,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (user: UserProfile) => void;
+  isMandatory?: boolean;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({
+  isOpen,
+  onClose,
+  onLoginSuccess,
+  isMandatory = false,
+}) => {
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -30,66 +35,55 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
     e.preventDefault();
     setErrorMsg(null);
 
-    if (!username.trim() || !password.trim()) {
-      setErrorMsg('দয়া করে আইডি (Username) এবং পাসওয়ার্ড লিখুন।');
+    const cleanUser = username.trim();
+    const cleanPass = password.trim();
+
+    if (!cleanUser || !cleanPass) {
+      setErrorMsg('দয়া করে আইডি (ID / Username) এবং পাসওয়ার্ড লিখুন।');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const user = await authenticateUser(username, password);
+      const user = await authenticateUser(cleanUser, cleanPass);
       if (user) {
         onLoginSuccess(user);
         onClose();
       } else {
-        setErrorMsg('ভুল ইউজার আইডি অথবা পাসওয়ার্ড! পুনরায় চেষ্টা করুন।');
+        setErrorMsg('ভুল ইউজার আইডি অথবা পাসওয়ার্ড! অনুগ্রহ করে সঠিক তথ্য প্রদান করুন।');
       }
     } catch {
-      setErrorMsg('লগইন করার সময় ত্রুটি ঘটেছে। আবার চেষ্টা করুন।');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleQuickLogin = async (targetUser: UserProfile, pass: string) => {
-    setUsername(targetUser.username);
-    setPassword(pass);
-    setErrorMsg(null);
-    setIsSubmitting(true);
-    try {
-      const user = await authenticateUser(targetUser.username, pass);
-      if (user) {
-        onLoginSuccess(user);
-        onClose();
-      }
-    } catch (err) {
-      console.error(err);
+      setErrorMsg('লগইন করার সময় সার্ভার বা সিস্টেমে ত্রুটি ঘটেছে। আবার চেষ্টা করুন।');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-xs p-4 animate-in fade-in duration-200">
       <div className="bg-white border border-slate-200 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 text-white p-5 relative">
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-4 right-4 text-blue-200 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
+        <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-blue-900 text-white p-5 relative">
+          {!isMandatory && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute top-4 right-4 text-blue-200 hover:text-white p-1 rounded-lg hover:bg-white/10 transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
 
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-white">
-              <Building2 className="w-6 h-6 text-blue-200" />
+            <div className="w-11 h-11 rounded-xl bg-white p-1 border border-white/20 flex items-center justify-center shadow-md">
+              <img src="/walton-logo.png" alt="Walton Logo" className="h-8 object-contain" />
             </div>
             <div>
-              <h2 className="text-base font-bold tracking-tight">Walton SOP Portal Login</h2>
-              <p className="text-xs text-blue-200">
-                প্রসেস অটোমেশন ও এসওপি ম্যানেজমেন্ট সিস্টেম
+              <h2 className="text-base font-bold tracking-tight text-white flex items-center gap-1.5">
+                <span>Walton SOP Portal Login</span>
+              </h2>
+              <p className="text-[11px] text-blue-200">
+                প্রসেস অটোমেশন ও স্ট্যান্ডার্ড অপারেটিং প্রসিডিউর
               </p>
             </div>
           </div>
@@ -107,15 +101,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
               <User className="w-3.5 h-3.5 text-blue-600" />
-              <span>ইউজার আইডি (Username / ID)</span>
+              <span>ইউজার আইডি বা কর্মকর্তা আইডি (Username / ID)</span>
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="যেমন: Biplob, Dev, Sazzad, Kamrul"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+              placeholder="যেমন: Biplob বা 67544, Sazzad বা 50463"
+              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition font-medium"
               autoFocus
+              required
             />
           </div>
 
@@ -128,122 +123,24 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="পাসওয়ার্ড লিখুন..."
+              placeholder="আপনার গোপন পাসওয়ার্ড লিখুন"
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
+              required
             />
-            <p className="text-[10px] text-slate-400 mt-1">
-              সাধারণ ইউজার পাসওয়ার্ড: <code className="font-mono text-slate-600">Process@2026</code>
-            </p>
           </div>
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs shadow-md transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60"
+            className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-600 hover:to-blue-500 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             <LogIn className="w-4 h-4" />
-            <span>{isSubmitting ? 'প্রবেশ করা হচ্ছে...' : 'লগইন করুন (Login)'}</span>
+            <span>{isSubmitting ? 'যাচাই করা হচ্ছে...' : 'লগইন করুন (Sign In)'}</span>
           </button>
 
-          {/* Quick Demo Switcher */}
-          <div className="pt-3 border-t border-slate-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-500" />
-                <span>দ্রুত টেস্ট লগইন (১-ক্লিক সুইচ):</span>
-              </span>
-              <span className="text-[10px] text-slate-400">অটো সিলেক্ট</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-1.5 text-[10.5px]">
-              {/* Prepared By */}
-              <button
-                type="button"
-                onClick={() =>
-                  handleQuickLogin(
-                    INITIAL_USERS.find((u) => u.id === 'Biplob')!,
-                    'Process@2026'
-                  )
-                }
-                className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-left transition cursor-pointer"
-              >
-                <span className="font-bold block">Biplob</span>
-                <span className="text-[9px] text-emerald-600">Prepared By</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  handleQuickLogin(
-                    INITIAL_USERS.find((u) => u.id === 'Dev')!,
-                    'Process@2026'
-                  )
-                }
-                className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-left transition cursor-pointer"
-              >
-                <span className="font-bold block">Dev (Deb)</span>
-                <span className="text-[9px] text-emerald-600">Prepared By</span>
-              </button>
-
-              {/* Checked By */}
-              <button
-                type="button"
-                onClick={() =>
-                  handleQuickLogin(
-                    INITIAL_USERS.find((u) => u.id === 'Sazzad')!,
-                    'Process@2026'
-                  )
-                }
-                className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-left transition cursor-pointer"
-              >
-                <span className="font-bold block">Sazzad</span>
-                <span className="text-[9px] text-blue-600">Checked By</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  handleQuickLogin(
-                    INITIAL_USERS.find((u) => u.id === 'Rafi')!,
-                    'Process@2026'
-                  )
-                }
-                className="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 text-left transition cursor-pointer"
-              >
-                <span className="font-bold block">Rafi</span>
-                <span className="text-[9px] text-blue-600">Checked By</span>
-              </button>
-
-              {/* Approved By */}
-              <button
-                type="button"
-                onClick={() =>
-                  handleQuickLogin(
-                    INITIAL_USERS.find((u) => u.id === 'Kamrul')!,
-                    'Process@2026'
-                  )
-                }
-                className="p-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-left transition cursor-pointer"
-              >
-                <span className="font-bold block">Kamrul</span>
-                <span className="text-[9px] text-purple-600">Approved By</span>
-              </button>
-
-              {/* Admin */}
-              <button
-                type="button"
-                onClick={() =>
-                  handleQuickLogin(
-                    INITIAL_USERS.find((u) => u.id === 'Admin_Sazzad')!,
-                    'ACprocess@2026'
-                  )
-                }
-                className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-left transition cursor-pointer"
-              >
-                <span className="font-bold block">Sazzad (Admin)</span>
-                <span className="text-[9px] text-rose-600">System Admin</span>
-              </button>
-            </div>
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-400 text-center">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Walton Process Development Enterprise System</span>
           </div>
         </form>
       </div>

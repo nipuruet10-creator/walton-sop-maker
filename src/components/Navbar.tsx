@@ -4,7 +4,6 @@ import {
   Printer,
   Download,
   Upload,
-  RotateCcw,
   Sparkles,
   ZoomIn,
   ZoomOut,
@@ -27,6 +26,7 @@ interface NavbarProps {
   onOpenLogin: () => void;
   onLogout: () => void;
   onOpenWorkspace: () => void;
+  onOpenMasterArchive: () => void;
   onOpenConcernSection: () => void;
   onOpenAnalytics: () => void;
   onOpenAdminPanel: () => void;
@@ -36,11 +36,6 @@ interface NavbarProps {
   onExportExcel: () => void;
   onExportJson: () => void;
   onImportJson: () => void;
-  onReset: () => void;
-  onOpenApiKeyModal: () => void;
-  hasApiKey: boolean;
-  activeProvider?: 'openrouter' | 'gemini';
-  activeModel?: string;
   zoom: number;
   setZoom: React.Dispatch<React.SetStateAction<number>>;
   onAutoGenerate: () => void;
@@ -54,6 +49,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenLogin,
   onLogout,
   onOpenWorkspace,
+  onOpenMasterArchive,
   onOpenConcernSection,
   onOpenAnalytics,
   onOpenAdminPanel,
@@ -63,11 +59,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onExportExcel,
   onExportJson,
   onImportJson,
-  onReset,
-  onOpenApiKeyModal,
-  hasApiKey,
-  activeProvider = 'openrouter',
-  activeModel = 'openrouter/free',
   zoom,
   setZoom,
   onAutoGenerate,
@@ -113,6 +104,16 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="hidden xl:flex items-center gap-1.5 ml-2 pl-3 border-l border-slate-700">
           <button
             type="button"
+            onClick={onOpenMasterArchive}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/60 text-xs font-semibold transition cursor-pointer"
+            title="সকল প্রস্তুতকারীর SOP মাস্টার আর্কাইভ ও স্থায়ী ব্যাকআপ"
+          >
+            <FolderArchive className="w-3.5 h-3.5 text-indigo-400" />
+            <span>মাস্টার আর্কাইভ</span>
+          </button>
+
+          <button
+            type="button"
             onClick={onOpenConcernSection}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-700/60 text-xs font-semibold transition cursor-pointer"
             title="অনুমোদিত SOP কেন্দ্রীয় আর্কাইভ ও সরাসরি PDF ডাউনলোড"
@@ -136,10 +137,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               onClick={onOpenAdminPanel}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-950/70 hover:bg-rose-900 text-rose-200 border border-rose-800/80 text-xs font-semibold transition cursor-pointer"
-              title="ইউজার ম্যানেজমেন্ট ও পাসওয়ার্ড রিকভারি"
+              title="ইউজার ম্যানেজমেন্ট ও সেন্ট্রাল AI কনফিগারেশন"
             >
               <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-              <span>অ্যাডমিন সেটিংস</span>
+              <span>অ্যাডমিন প্যানেল</span>
             </button>
           )}
         </div>
@@ -278,6 +279,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex xl:hidden items-center gap-1">
           <button
             type="button"
+            onClick={onOpenMasterArchive}
+            className="p-1.5 rounded-lg bg-indigo-900/60 text-indigo-300 border border-indigo-700"
+            title="মাস্টার আর্কাইভ"
+          >
+            <FolderArchive className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
             onClick={onOpenConcernSection}
             className="p-1.5 rounded-lg bg-emerald-900/60 text-emerald-300 border border-emerald-700"
             title="কনসার্ন সেকশন"
@@ -330,26 +339,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* AI Key Config */}
-        <button
-          onClick={onOpenApiKeyModal}
-          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium border transition cursor-pointer ${
-            hasApiKey
-              ? 'bg-blue-950/70 text-blue-200 border-blue-600 hover:bg-blue-900/70 shadow-xs'
-              : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-          }`}
-          title="Configure OpenRouter / Gemini AI Models"
-        >
-          <Sparkles className={`w-3.5 h-3.5 ${hasApiKey ? 'text-amber-300' : 'text-slate-400'}`} />
-          <span className="hidden 2xl:inline">
-            {hasApiKey
-              ? activeProvider === 'openrouter'
-                ? `AI: ${activeModel.replace(':free', '').split('/').pop()}`
-                : 'Gemini AI Ready'
-              : 'Free AI Setup'}
-          </span>
-        </button>
-
         {/* Export to Excel */}
         <button
           onClick={onExportExcel}
@@ -394,15 +383,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           title="Load JSON"
         >
           <Upload className="w-3.5 h-3.5" />
-        </button>
-
-        {/* Reset */}
-        <button
-          onClick={onReset}
-          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition cursor-pointer"
-          title="Reset to Walton Sample"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
         </button>
       </div>
     </header>

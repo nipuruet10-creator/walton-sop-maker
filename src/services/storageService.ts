@@ -7,95 +7,167 @@ const STORE_USERS = 'users';
 const STORE_SOPS = 'sops';
 const CURRENT_USER_STORAGE_KEY = 'walton_sop_active_user_v2';
 
-// Pre-seeded Users as explicitly requested by User
+// Global AI Configuration Interface & Storage
+export interface GlobalAiConfig {
+  activeProvider: 'openrouter' | 'gemini';
+  openRouterKey: string;
+  openRouterModel: string;
+  geminiKey: string;
+  updatedAt?: string;
+}
+
+const GLOBAL_AI_CONFIG_KEY = 'walton_sop_global_ai_config_v1';
+
+export function getGlobalAiConfig(): GlobalAiConfig {
+  try {
+    const stored = localStorage.getItem(GLOBAL_AI_CONFIG_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.warn('Error reading global AI config', e);
+  }
+  return {
+    activeProvider: (localStorage.getItem('walton_sop_ai_provider') as any) || 'openrouter',
+    openRouterKey: localStorage.getItem('walton_sop_openrouter_api_key') || '',
+    openRouterModel: localStorage.getItem('walton_sop_openrouter_model') || 'openrouter/free',
+    geminiKey: localStorage.getItem('walton_sop_gemini_key') || '',
+  };
+}
+
+export function saveGlobalAiConfig(config: GlobalAiConfig): void {
+  try {
+    const payload = { ...config, updatedAt: new Date().toISOString() };
+    localStorage.setItem(GLOBAL_AI_CONFIG_KEY, JSON.stringify(payload));
+    localStorage.setItem('walton_sop_ai_provider', config.activeProvider);
+    localStorage.setItem('walton_sop_openrouter_api_key', config.openRouterKey);
+    localStorage.setItem('walton_sop_openrouter_model', config.openRouterModel);
+    localStorage.setItem('walton_sop_gemini_key', config.geminiKey);
+  } catch (e) {
+    console.warn('Error saving global AI config', e);
+  }
+}
+
+// Pre-seeded Users as explicitly requested by User from Photo 2
 export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'Biplob',
+    employeeId: '67544',
     username: 'Biplob',
-    name: 'Biplob Hossain',
+    name: 'Biplob (67544)',
     role: 'prepared_by',
-    designation: 'Process Engineer',
-    department: 'Process Automation & IE',
+    designation: 'Senior Officer',
+    department: 'Process Development',
     passwordHash: 'Process@2026',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
     id: 'Dev',
+    employeeId: '54150',
     username: 'Dev',
-    name: 'Deb Broto',
+    name: 'Deb (54150)',
     role: 'prepared_by',
-    designation: 'Process Engineer',
-    department: 'Process Automation & IE',
+    designation: 'Principal Officer',
+    department: 'Process Development',
     passwordHash: 'Process@2026',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
-    id: 'Sazzad',
-    username: 'Sazzad',
-    name: 'Sazzad Hossain',
-    role: 'checked_by',
-    designation: 'Sr. Process Engineer / In-Charge',
-    department: 'Process Automation',
-    passwordHash: 'Process@2026',
-    createdAt: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'Rafi',
-    username: 'Rafi',
-    name: 'Rafiul Islam',
-    role: 'checked_by',
-    designation: 'Section In-Charge',
-    department: 'Production Management',
-    passwordHash: 'Process@2026',
-    createdAt: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'Hashmi',
-    username: 'Hashmi',
-    name: 'Hashmi Ahmed',
-    role: 'checked_by',
-    designation: 'QA In-Charge',
-    department: 'Quality Assurance',
-    passwordHash: 'Process@2026',
-    createdAt: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: 'Pear',
-    username: 'Pear',
-    name: 'Pear Mohammad',
-    role: 'checked_by',
-    designation: 'Production In-Charge',
-    department: 'AC Manufacturing Division',
+    id: 'Jowel',
+    employeeId: '7686',
+    username: 'Jowel',
+    name: 'Jowel (7686)',
+    role: 'prepared_by',
+    designation: 'Assistant Director',
+    department: 'Process Development',
     passwordHash: 'Process@2026',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
     id: 'Emon',
+    employeeId: '58279',
     username: 'Emon',
-    name: 'Emon Hasan',
+    name: 'Emon (58279)',
     role: 'checked_by',
-    designation: 'Technical In-Charge',
-    department: 'Engineering Operations',
+    designation: 'Assistant Director',
+    department: 'Process Development',
+    passwordHash: 'Process@2026',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'Faiyaz',
+    employeeId: '54634',
+    username: 'Faiyaz',
+    name: 'Faiyaz (54634)',
+    role: 'checked_by',
+    designation: 'Assistant Director',
+    department: 'Process Development',
+    passwordHash: 'Process@2026',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'Hashmi',
+    employeeId: '56880',
+    username: 'Hashmi',
+    name: 'Hashmi (56880)',
+    role: 'checked_by',
+    designation: 'Senior Deputy Director',
+    department: 'Process Development',
+    passwordHash: 'Process@2026',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'Pear',
+    employeeId: '54636',
+    username: 'Pear',
+    name: 'Pear (54636)',
+    role: 'checked_by',
+    designation: 'Assistant Director',
+    department: 'Process Development',
+    passwordHash: 'Process@2026',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'Rafi',
+    employeeId: '45127',
+    username: 'Rafi',
+    name: 'Rafi (45127)',
+    role: 'checked_by',
+    designation: 'Deputy Director',
+    department: 'Process Development',
+    passwordHash: 'Process@2026',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'Sazzad',
+    employeeId: '50463',
+    username: 'Sazzad',
+    name: 'Sazzad Hossain',
+    role: 'checked_by',
+    designation: 'Process Engineer',
+    department: 'AC Process',
     passwordHash: 'Process@2026',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
     id: 'Kamrul',
+    employeeId: '44819',
     username: 'Kamrul',
-    name: 'Kamrul Hasan',
+    name: 'Kamrul (44819)',
     role: 'approved_by',
-    designation: 'Head of Dept / Plant Manager',
-    department: 'Plant Operations & Manufacturing',
+    designation: 'HOD',
+    department: 'Process Development',
     passwordHash: 'Process@2026',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
     id: 'Admin_Sazzad',
+    employeeId: '50463',
     username: 'Admin_Sazzad',
-    name: 'Sazzad (Admin)',
+    name: 'Sazzad (50463) (Admin)',
     role: 'admin',
-    designation: 'System Administrator & Process Lead',
-    department: 'System & Process Governance',
+    designation: 'Process Engineer',
+    department: 'AC Process',
     passwordHash: 'ACprocess@2026',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
@@ -141,17 +213,30 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-// Seed initial users if store is empty
+// Seed / sync initial users into store
 async function seedInitialData(db: IDBDatabase): Promise<void> {
   return new Promise((resolve) => {
     const tx = db.transaction(STORE_USERS, 'readwrite');
     const store = tx.objectStore(STORE_USERS);
-    const countReq = store.count();
+    const getAllReq = store.getAll();
 
-    countReq.onsuccess = () => {
-      if (countReq.result === 0) {
-        INITIAL_USERS.forEach((u) => store.put(u));
-      }
+    getAllReq.onsuccess = () => {
+      const existing = (getAllReq.result as UserProfile[]) || [];
+      INITIAL_USERS.forEach((initUser) => {
+        const found = existing.find((u) => u.id === initUser.id);
+        if (!found) {
+          store.put(initUser);
+        } else if (!found.employeeId || found.designation !== initUser.designation) {
+          // Sync new employeeId or designation while preserving any custom saved password / signature
+          store.put({
+            ...found,
+            employeeId: initUser.employeeId,
+            name: initUser.name,
+            designation: initUser.designation,
+            department: initUser.department,
+          });
+        }
+      });
     };
 
     tx.oncomplete = () => resolve();
@@ -162,26 +247,27 @@ async function seedInitialData(db: IDBDatabase): Promise<void> {
 // ==================== AUTH METHODS ====================
 
 export async function authenticateUser(usernameInput: string, passwordInput: string): Promise<UserProfile | null> {
-  const cleanUsername = usernameInput.trim();
+  const clean = usernameInput.trim().toLowerCase();
   const cleanPassword = passwordInput.trim();
 
-  // Special Admin login check: Admin ID 'Sazzad' with password 'ACprocess@2026'
-  if (cleanUsername.toLowerCase() === 'sazzad' && cleanPassword === 'ACprocess@2026') {
-    return INITIAL_USERS.find((u) => u.id === 'Admin_Sazzad') || null;
-  }
-
-  // Also support entering username as 'admin'
-  if (cleanUsername.toLowerCase() === 'admin' && cleanPassword === 'ACprocess@2026') {
-    return INITIAL_USERS.find((u) => u.id === 'Admin_Sazzad') || null;
+  // Special Admin login check: Admin ID 'Sazzad', '50463', or 'Admin_Sazzad' with password 'ACprocess@2026'
+  if (
+    (clean === 'sazzad' || clean === '50463' || clean === 'admin' || clean === 'admin_sazzad') &&
+    cleanPassword === 'ACprocess@2026'
+  ) {
+    const users = await getAllUsers();
+    return users.find((u) => u.role === 'admin') || INITIAL_USERS.find((u) => u.id === 'Admin_Sazzad') || null;
   }
 
   const users = await getAllUsers();
-  const matched = users.find(
-    (u) =>
-      (u.username.toLowerCase() === cleanUsername.toLowerCase() ||
-        u.name.toLowerCase().includes(cleanUsername.toLowerCase())) &&
-      u.passwordHash === cleanPassword
-  );
+  const matched = users.find((u) => {
+    const idMatch = u.id.toLowerCase() === clean;
+    const usernameMatch = u.username.toLowerCase() === clean;
+    const empIdMatch = u.employeeId && u.employeeId.toLowerCase() === clean;
+    const nameMatch = u.name.toLowerCase().includes(clean);
+
+    return (idMatch || usernameMatch || empIdMatch || nameMatch) && u.passwordHash === cleanPassword;
+  });
 
   return matched || null;
 }

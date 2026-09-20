@@ -248,7 +248,10 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
               <div className="w-[55%] flex flex-row divide-x divide-black">
                 {/* Prepared By */}
                 <div className="flex-1 flex flex-col justify-between p-0.5 bg-white text-[8.5px] min-h-[58px] overflow-hidden">
-                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50 shrink-0">Prepared By</div>
+                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50 shrink-0 leading-tight">
+                    Prepared By
+                    <span className="block text-[7px] text-slate-600 font-normal">Process concern</span>
+                  </div>
                   <div className="flex-1 w-full flex items-center justify-center p-0 overflow-hidden min-h-[38px]">
                     {header.preparedBy.signatureImg ? (
                       <img
@@ -269,7 +272,10 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
 
                 {/* Checked By */}
                 <div className="flex-1 flex flex-col justify-between p-0.5 bg-white text-[8.5px] min-h-[58px] overflow-hidden">
-                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50 shrink-0">Checked By</div>
+                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50 shrink-0 leading-tight">
+                    Checked By
+                    <span className="block text-[7px] text-slate-600 font-normal">Section In charge</span>
+                  </div>
                   <div className="flex-1 w-full flex items-center justify-center p-0 overflow-hidden min-h-[38px]">
                     {header.checkedBy.signatureImg ? (
                       <img
@@ -287,7 +293,10 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
 
                 {/* Approved By */}
                 <div className="flex-1 flex flex-col justify-between p-0.5 bg-white text-[8.5px] min-h-[58px] overflow-hidden">
-                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50 shrink-0">Approved By</div>
+                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50 shrink-0 leading-tight">
+                    Approved By
+                    <span className="block text-[7px] text-slate-600 font-normal">Process HOD</span>
+                  </div>
                   <div className="flex-1 w-full flex items-center justify-center p-0 overflow-hidden min-h-[38px]">
                     {header.approvedBy.signatureImg ? (
                       <img

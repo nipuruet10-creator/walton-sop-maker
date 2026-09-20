@@ -10,10 +10,10 @@ import { HeaderEditor } from './components/InputPanel/HeaderEditor';
 import { SafetyEditor } from './components/InputPanel/SafetyEditor';
 import { TablesEditor } from './components/InputPanel/TablesEditor';
 import { SOPPaper } from './components/Preview/SOPPaper';
-import { ApiKeyModal } from './components/Modals/ApiKeyModal';
 import { LoginModal } from './components/Auth/LoginModal';
 import { UserWorkspaceModal } from './components/Workspace/UserWorkspaceModal';
 import { ConcernSectionView } from './components/Archive/ConcernSectionView';
+import { MasterArchiveModal } from './components/Archive/MasterArchiveModal';
 import { AnalyticsDashboardModal } from './components/Analytics/AnalyticsDashboardModal';
 import { AdminPanelModal } from './components/Admin/AdminPanelModal';
 import {
@@ -30,7 +30,7 @@ import {
 import {
   getActiveUserSession,
   setActiveUserSession,
-  INITIAL_USERS,
+  getGlobalAiConfig,
   getUserNotifications,
   getSOPById,
 } from './services/storageService';
@@ -53,7 +53,6 @@ import {
 
 const STORAGE_KEY = 'walton_sop_current_doc_v2';
 const GEMINI_KEY_STORAGE = 'walton_sop_gemini_key';
-const AI_PROVIDER_STORAGE = 'walton_sop_ai_provider';
 
 type ActiveTab = 'photos' | 'procedure' | 'header' | 'safety' | 'tables';
 
@@ -69,37 +68,47 @@ export const App: React.FC = () => {
     return defaultSopData;
   });
 
-  // User session state (Biplob as default starting user)
+  // User session state (mandatory login on first visit or when logged out)
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    return getActiveUserSession() || INITIAL_USERS.find((u) => u.id === 'Biplob') || null;
+    return getActiveUserSession() || null;
   });
 
   // Modals state
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(() => {
+    return !getActiveUserSession();
+  });
   const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState<boolean>(false);
+  const [isMasterArchiveOpen, setIsMasterArchiveOpen] = useState<boolean>(false);
   const [isConcernSectionOpen, setIsConcernSectionOpen] = useState<boolean>(false);
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState<boolean>(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
 
-  // OpenRouter & Gemini AI Settings
+  // Centralized AI Settings from storage
   const [openRouterKey, setOpenRouterKey] = useState<string>(() => {
-    return localStorage.getItem(OPENROUTER_API_KEY_STORAGE) || '';
+    return getGlobalAiConfig().openRouterKey || localStorage.getItem(OPENROUTER_API_KEY_STORAGE) || '';
   });
   const [openRouterModel, setOpenRouterModel] = useState<string>(() => {
-    return localStorage.getItem(OPENROUTER_MODEL_STORAGE) || 'openrouter/free';
+    return getGlobalAiConfig().openRouterModel || localStorage.getItem(OPENROUTER_MODEL_STORAGE) || 'openrouter/free';
   });
   const [geminiKey, setGeminiKey] = useState<string>(() => {
-    return localStorage.getItem(GEMINI_KEY_STORAGE) || '';
+    return getGlobalAiConfig().geminiKey || localStorage.getItem(GEMINI_KEY_STORAGE) || '';
   });
   const [activeProvider, setActiveProvider] = useState<'openrouter' | 'gemini'>(() => {
-    const saved = localStorage.getItem(AI_PROVIDER_STORAGE);
-    return saved === 'gemini' ? 'gemini' : 'openrouter';
+    return getGlobalAiConfig().activeProvider || 'openrouter';
   });
+
+  // Sync AI configuration whenever Admin Panel closes or changes
+  useEffect(() => {
+    const cfg = getGlobalAiConfig();
+    if (cfg.openRouterKey) setOpenRouterKey(cfg.openRouterKey);
+    if (cfg.openRouterModel) setOpenRouterModel(cfg.openRouterModel);
+    if (cfg.geminiKey) setGeminiKey(cfg.geminiKey);
+    if (cfg.activeProvider) setActiveProvider(cfg.activeProvider);
+  }, [isAdminModalOpen]);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('photos');
   const [zoom, setZoom] = useState<number>(0.85);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
-  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isGeneratingQuality, setIsGeneratingQuality] = useState<boolean>(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
@@ -169,28 +178,34 @@ export const App: React.FC = () => {
   const handleLoginSuccess = (user: UserProfile) => {
     setCurrentUser(user);
     setActiveUserSession(user);
+    setIsLoginModalOpen(false);
+    setData((prev) => {
+      if (!prev.header.preparedBy.name) {
+        return {
+          ...prev,
+          authorId: user.id,
+          authorName: user.name,
+          header: {
+            ...prev.header,
+            preparedBy: {
+              ...prev.header.preparedBy,
+              name: user.name,
+              designation: user.designation,
+              dept: user.department,
+              date: new Date().toISOString().split('T')[0],
+              signatureImg: user.defaultSignatureImg || prev.header.preparedBy.signatureImg,
+            },
+          },
+        };
+      }
+      return prev;
+    });
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     setActiveUserSession(null);
-  };
-
-  const handleSaveAiConfig = (config: {
-    openRouterKey: string;
-    openRouterModel: string;
-    geminiKey: string;
-    activeProvider: 'openrouter' | 'gemini';
-  }) => {
-    setOpenRouterKey(config.openRouterKey);
-    setOpenRouterModel(config.openRouterModel);
-    setGeminiKey(config.geminiKey);
-    setActiveProvider(config.activeProvider);
-
-    localStorage.setItem(OPENROUTER_API_KEY_STORAGE, config.openRouterKey);
-    localStorage.setItem(OPENROUTER_MODEL_STORAGE, config.openRouterModel);
-    localStorage.setItem(GEMINI_KEY_STORAGE, config.geminiKey);
-    localStorage.setItem(AI_PROVIDER_STORAGE, config.activeProvider);
+    setIsLoginModalOpen(true);
   };
 
   const handlePrint = () => {
@@ -249,12 +264,6 @@ export const App: React.FC = () => {
     if (importFileRef.current) importFileRef.current.value = '';
   };
 
-  const handleReset = () => {
-    if (confirm('Are you sure you want to reset to the Walton sample SOP? Any unsaved edits will be lost.')) {
-      setData(defaultSopData);
-    }
-  };
-
   const handleNewSop = () => {
     setData({
       ...defaultSopData,
@@ -289,11 +298,17 @@ export const App: React.FC = () => {
 
     setIsGenerating(true);
     try {
+      const globalCfg = getGlobalAiConfig();
+      const effProvider = globalCfg.activeProvider || activeProvider;
+      const effOpenRouterKey = globalCfg.openRouterKey || openRouterKey;
+      const effOpenRouterModel = globalCfg.openRouterModel || openRouterModel;
+      const effGeminiKey = globalCfg.geminiKey || geminiKey;
+
       let result;
-      if (activeProvider === 'gemini' && geminiKey) {
-        result = await generateSOPWithGemini(input, geminiKey, data.photos.length);
-      } else if (openRouterKey) {
-        result = await generateSOPWithOpenRouter(input, openRouterKey, openRouterModel, data.photos.length);
+      if (effProvider === 'gemini' && effGeminiKey) {
+        result = await generateSOPWithGemini(input, effGeminiKey, data.photos.length);
+      } else if (effOpenRouterKey) {
+        result = await generateSOPWithOpenRouter(input, effOpenRouterKey, effOpenRouterModel, data.photos.length);
       } else {
         result = offlineConvertBanglish(input);
       }
@@ -336,9 +351,13 @@ export const App: React.FC = () => {
 
     setIsGeneratingQuality(true);
     try {
+      const globalCfg = getGlobalAiConfig();
+      const effOpenRouterKey = globalCfg.openRouterKey || openRouterKey;
+      const effOpenRouterModel = globalCfg.openRouterModel || openRouterModel;
+
       let points: string[];
-      if (openRouterKey) {
-        points = await generateQualityPointsWithOpenRouter(input, openRouterKey, openRouterModel);
+      if (effOpenRouterKey) {
+        points = await generateQualityPointsWithOpenRouter(input, effOpenRouterKey, effOpenRouterModel);
       } else {
         points = offlineConvertQualityPoints(input);
       }
@@ -386,6 +405,7 @@ export const App: React.FC = () => {
         onOpenLogin={() => setIsLoginModalOpen(true)}
         onLogout={handleLogout}
         onOpenWorkspace={() => setIsWorkspaceModalOpen(true)}
+        onOpenMasterArchive={() => setIsMasterArchiveOpen(true)}
         onOpenConcernSection={() => setIsConcernSectionOpen(true)}
         onOpenAnalytics={() => setIsAnalyticsModalOpen(true)}
         onOpenAdminPanel={() => setIsAdminModalOpen(true)}
@@ -394,11 +414,6 @@ export const App: React.FC = () => {
         onExportExcel={handleExportExcel}
         onExportJson={handleExportJson}
         onImportJson={() => importFileRef.current?.click()}
-        onReset={handleReset}
-        onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
-        hasApiKey={Boolean(openRouterKey || geminiKey)}
-        activeProvider={activeProvider}
-        activeModel={openRouterModel}
         zoom={zoom}
         setZoom={setZoom}
         onAutoGenerate={handleAutoGenerate}
@@ -550,7 +565,13 @@ export const App: React.FC = () => {
                     hasApiKey={Boolean(openRouterKey || geminiKey)}
                     activeProvider={activeProvider}
                     activeModel={openRouterModel}
-                    onOpenAiModal={() => setIsApiKeyModalOpen(true)}
+                    onOpenAiModal={() => {
+                      if (currentUser?.role === 'admin') {
+                        setIsAdminModalOpen(true);
+                      } else {
+                        alert('সেন্ট্রাল AI ইঞ্জিন কনফিগারেশন অ্যাডমিন প্যানেল থেকে নিয়ন্ত্রিত হয়।');
+                      }
+                    }}
                     stepFontSize={data.stepFontSize || 'auto'}
                     onFontSizeChange={(stepFontSize) => setData((prev) => ({ ...prev, stepFontSize }))}
                     qualityFontSize={data.qualityFontSize || 'auto'}
@@ -761,21 +782,23 @@ export const App: React.FC = () => {
         </main>
       </div>
 
-      {/* AI Configuration Modal */}
-      <ApiKeyModal
-        isOpen={isApiKeyModalOpen}
-        onClose={() => setIsApiKeyModalOpen(false)}
-        openRouterKey={openRouterKey}
-        openRouterModel={openRouterModel}
-        geminiKey={geminiKey}
-        activeProvider={activeProvider}
-        onSaveConfig={handleSaveAiConfig}
+      {/* Master Archive / Prepared-by Grouped SOP Modal */}
+      <MasterArchiveModal
+        isOpen={isMasterArchiveOpen}
+        onClose={() => setIsMasterArchiveOpen(false)}
+        currentUser={currentUser}
+        onSelectSop={(sop) => setData(sop)}
       />
 
       {/* Authentication Login Modal */}
       <LoginModal
-        isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
+        isOpen={isLoginModalOpen || !currentUser}
+        isMandatory={!currentUser}
+        onClose={() => {
+          if (currentUser) {
+            setIsLoginModalOpen(false);
+          }
+        }}
         onLoginSuccess={handleLoginSuccess}
       />
 
