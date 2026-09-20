@@ -51,6 +51,7 @@ import {
   FileDown,
   Type,
   LayoutGrid,
+  RotateCcw,
 } from 'lucide-react';
 
 const GEMINI_KEY_STORAGE = 'walton_sop_gemini_key';
@@ -69,7 +70,18 @@ export const App: React.FC = () => {
     if (session) {
       try {
         const cached = localStorage.getItem(`walton_sop_user_draft_v2_${session.id}`);
-        if (cached) return JSON.parse(cached);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          // Purge trial BOPP Tape draft if present to guarantee clean blank default
+          if (
+            parsed.header?.processName?.includes('BOPP Tape') ||
+            (parsed.photos && parsed.photos.some((p: any) => p.url?.includes('Tape Dispenser') || p.name?.includes('Pasted Image')))
+          ) {
+            localStorage.removeItem(`walton_sop_user_draft_v2_${session.id}`);
+            return createDefaultSopForUser(session);
+          }
+          return parsed;
+        }
       } catch (e) {
         console.error('Failed to parse cached user SOP', e);
       }
@@ -263,11 +275,39 @@ export const App: React.FC = () => {
   };
 
   const handleNewSop = () => {
+    const hasContent =
+      Boolean(data.header.processName?.trim()) ||
+      Boolean(data.header.model?.trim()) ||
+      data.photos.length > 0 ||
+      data.procedure.steps.length > 0;
+
+    if (hasContent) {
+      const confirmNew = window.confirm(
+        'আপনি কি নতুন ব্ল্যাঙ্ক SOP তৈরি করতে চান? বর্তমান অসংরক্ষিত ফিল্ড ও ছবি ক্লিয়ার হবে।'
+      );
+      if (!confirmNew) return;
+    }
+
     if (currentUser) {
       const fresh = createDefaultSopForUser(currentUser);
       setData(fresh);
       saveUserWorkingDraft(currentUser.id, fresh);
       setIsWorkspaceModalOpen(false);
+    } else {
+      setData(defaultSopData);
+    }
+  };
+
+  const handleResetSop = () => {
+    const confirmReset = window.confirm(
+      'আপনি কি বর্তমান SOP-এর সব টেক্সট, ছবি ও ধাপ রিসেট করে সম্পূর্ণ খালি (Reset) করতে চান?'
+    );
+    if (!confirmReset) return;
+
+    if (currentUser) {
+      const fresh = createDefaultSopForUser(currentUser);
+      setData(fresh);
+      saveUserWorkingDraft(currentUser.id, fresh);
     } else {
       setData(defaultSopData);
     }
@@ -403,6 +443,8 @@ export const App: React.FC = () => {
         onAutoGenerate={handleAutoGenerate}
         isGenerating={isGenerating}
         isDownloadingPdf={isDownloadingPdf}
+        onNewSop={handleNewSop}
+        onResetSop={handleResetSop}
       />
 
       {/* Workflow & Approval Status Action Bar */}
@@ -412,6 +454,8 @@ export const App: React.FC = () => {
         onUpdateSop={(updated) => setData(updated)}
         onOpenWorkspace={() => setIsWorkspaceModalOpen(true)}
         onOpenLogin={() => setIsLoginModalOpen(true)}
+        onNewSop={handleNewSop}
+        onResetSop={handleResetSop}
       />
 
       {/* Main Workspace Area (Left Input Panel + Right Live Canvas) */}
@@ -437,6 +481,15 @@ export const App: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handleResetSop}
+                    className="flex items-center gap-1 bg-rose-900/80 hover:bg-rose-800 text-rose-200 text-[11px] font-bold px-2 py-1 rounded transition cursor-pointer border border-rose-700/60"
+                    title="বর্তমান ফর্মের সব তথ্য রিসেট / খালি করুন"
+                  >
+                    <RotateCcw className="w-3 h-3 text-rose-300" />
+                    <span>রিসেট</span>
+                  </button>
                   <button
                     type="button"
                     onClick={handleExportExcel}

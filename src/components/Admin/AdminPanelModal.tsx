@@ -14,6 +14,7 @@ import {
   type GlobalAiConfig,
   getCloudSyncUrl,
   setCloudSyncUrl,
+  clearTrialData,
 } from '../../services/storageService';
 import {
   testOpenRouterKey,
@@ -353,6 +354,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
       }
     };
     reader.readAsText(file);
+  };
+
+  const handleClearTrialData = async () => {
+    const ok = window.confirm(
+      'সতর্কতা: আপনি কি নিশ্চিত যে পূর্ববর্তী সকল ট্রায়াল SOP ডাটা ও টেস্ট রেকর্ড মুছে ফেলতে চান? এটি সমস্ত ট্রায়াল রেকর্ড ক্লিয়ার করে নতুন ফ্রেশ ডাটাবেজ প্রস্তুত করবে।'
+    );
+    if (!ok) return;
+
+    const res = await clearTrialData();
+    showNotification(`ট্রায়াল ডাটা সফলভাবে মুছে ফেলা হয়েছে (${res.sopsDeleted} টি ট্রায়াল রেকর্ড ক্লিয়ার করা হয়েছে)!`);
   };
 
   // Filtered Users List
@@ -1080,6 +1091,30 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     ডিফল্ট মান: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-700">/api/sync</code> (ভার্সেল সার্ভারলেস সিঙ্ক)। কোম্পানি ইন্টারনাল সার্ভার থাকলে তার URL দিতে পারেন।
                   </p>
                 </div>
+              </div>
+
+              {/* Reset Trial Data & Analytics Card */}
+              <div className="bg-rose-50/70 rounded-2xl p-6 border border-rose-200 shadow-xs space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-rose-950">ডাটাবেজ ও অ্যানালিটিক্স ট্রায়াল ডাটা ক্লিনআপ (Reset Trial Data)</h3>
+                    <p className="text-xs text-rose-700">
+                      সিস্টেম পরীক্ষার সময় তৈরি হওয়া সমস্ত পরীক্ষামূলক (Trial) SOP ও অ্যানালিটিক্স রেকর্ড সম্পূর্ণ মুছে ফ্রেশ করুন।
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleClearTrialData}
+                  className="w-full py-2.5 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>ট্রায়াল ডাটা ও অ্যানালিটিক্স সম্পূর্ণ রিসেট করুন</span>
+                </button>
               </div>
             </div>
           )}

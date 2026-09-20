@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { SOPDocument } from '../../types/sop';
-import { getAllSOPs } from '../../services/storageService';
+import { getAllSOPs, clearTrialData } from '../../services/storageService';
 import {
   BarChart3,
   CheckCircle2,
@@ -11,6 +11,7 @@ import {
   Award,
   FileText,
   X,
+  Trash2,
 } from 'lucide-react';
 
 interface AnalyticsDashboardModalProps {
@@ -56,18 +57,48 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
     }
   };
 
+  const handleClearTrialData = async () => {
+    const ok = window.confirm(
+      'আপনি কি নিশ্চিত যে পূর্বের সব ট্রায়াল ও টেস্ট ডাটা মুছে অ্যানালিটিক্স সম্পূর্ণ ফ্রেশ ও শূন্য করতে চান?'
+    );
+    if (!ok) return;
+    await clearTrialData();
+    await loadData();
+    alert('ট্রায়াল ডাটা সফলভাবে মুছে ফেলা হয়েছে!');
+  };
+
   if (!isOpen) return null;
 
-  // Filter completed / approved SOPs
-  const approvedSops = sops.filter((s) => s.status === 'approved');
-  const inProgressSops = sops.filter((s) => s.status === 'forwarded_to_checker' || s.status === 'forwarded_to_approver');
-  const draftSops = sops.filter((s) => !s.status || s.status === 'draft' || s.status === 'rejected');
+  // Filter out legacy trial BOPP Tape demo SOPs
+  const realSops = sops.filter(
+    (s) =>
+      s.header?.processName &&
+      !s.header.processName.includes('BOPP Tape Attaching Working Procedure')
+  );
 
-  // Userwise completion calculation
+  // Filter completed / approved SOPs
+  const approvedSops = realSops.filter((s) => s.status === 'approved');
+  const inProgressSops = realSops.filter(
+    (s) =>
+      s.status === 'forwarded_to_checker' ||
+      s.status === 'forwarded_to_approver' ||
+      s.status === 'checked'
+  );
+  const draftSops = realSops.filter((s) => !s.status || s.status === 'draft' || s.status === 'rejected');
+
+  // Userwise completion calculation with deduplicated and normalized names
   const userCompletionMap: Record<string, { name: string; completed: number; inProgress: number; total: number }> = {};
 
-  sops.forEach((doc) => {
-    const authorKey = doc.authorName || doc.authorId || doc.header.preparedBy.name || 'Biplob Hossain';
+  realSops.forEach((doc) => {
+    let authorKey = doc.authorName || doc.authorId || doc.header?.preparedBy?.name || 'Process Engineer';
+    const lower = authorKey.toLowerCase();
+    if (lower.includes('biplob')) authorKey = 'Biplob Hossain (67544)';
+    else if (lower.includes('deb') || lower.includes('dev')) authorKey = 'Deb (54150)';
+    else if (lower.includes('sazzad')) authorKey = 'Sazzad (50463)';
+    else if (lower.includes('hashmi')) authorKey = 'Hashmi (56880)';
+    else if (lower.includes('jowel')) authorKey = 'Jowel (7686)';
+    else if (lower.includes('kamrul')) authorKey = 'Kamrul (44819)';
+
     if (!userCompletionMap[authorKey]) {
       userCompletionMap[authorKey] = {
         name: authorKey,
@@ -79,7 +110,11 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
     userCompletionMap[authorKey].total += 1;
     if (doc.status === 'approved') {
       userCompletionMap[authorKey].completed += 1;
-    } else if (doc.status === 'forwarded_to_checker' || doc.status === 'forwarded_to_approver') {
+    } else if (
+      doc.status === 'forwarded_to_checker' ||
+      doc.status === 'forwarded_to_approver' ||
+      doc.status === 'checked'
+    ) {
       userCompletionMap[authorKey].inProgress += 1;
     }
   });
@@ -126,6 +161,16 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleClearTrialData}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-700/60 text-xs font-bold transition cursor-pointer"
+              title="পূর্বের সব টেস্ট ও ট্রায়াল ডাটা মুছে অ্যানালিটিক্স ক্লিয়ার করুন"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span className="hidden sm:inline">ট্রায়াল ডাটা মুছুন</span>
+            </button>
+
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(parseInt(e.target.value, 10))}
@@ -165,7 +210,7 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
                   <div>
                     <span className="text-[11px] font-semibold text-slate-500 block">অনুমোদিত ও সম্পন্ন (Complete)</span>
                     <span className="text-2xl font-bold text-slate-900">{approvedSops.length}</span>
-                    <span className="text-[10px] text-emerald-600 block font-medium">কনসার্ন সেকশনে লাইভ</span>
+                    <span className="text-[10px] text-emerald-600 block font-medium">আর্কাইভে সংরক্ষিত ও লাইভ</span>
                   </div>
                 </div>
 

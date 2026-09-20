@@ -143,9 +143,9 @@ export const INITIAL_USERS: UserProfile[] = [
     id: 'Sazzad',
     employeeId: '50463',
     username: 'Sazzad',
-    name: 'Sazzad Hossain',
+    name: 'Sazzad (50463)',
     role: 'checked_by',
-    designation: 'Process Engineer',
+    designation: 'Process Automation Lead',
     department: 'AC Process',
     passwordHash: 'Process@2026',
     createdAt: '2026-01-01T00:00:00.000Z',
@@ -248,7 +248,10 @@ export function unmarkUserAsDeleted(userId: string): void {
 
 // Seed / sync initial users into store
 async function seedInitialData(db: IDBDatabase): Promise<void> {
+  // If Sazzad was previously deleted in test, unmark so Sazzad (50463) is available
+  unmarkUserAsDeleted('Sazzad');
   const deletedIds = getDeletedUserIds();
+
   return new Promise((resolve) => {
     const tx = db.transaction(STORE_USERS, 'readwrite');
     const store = tx.objectStore(STORE_USERS);
@@ -257,15 +260,19 @@ async function seedInitialData(db: IDBDatabase): Promise<void> {
     getAllReq.onsuccess = () => {
       const existing = (getAllReq.result as UserProfile[]) || [];
       INITIAL_USERS.forEach((initUser) => {
-        // Do not re-seed a user if deleted by Admin
+        // Do not re-seed a user if deleted by Admin (except Sazzad who was updated)
         if (deletedIds.includes(initUser.id)) {
           return;
         }
         const found = existing.find((u) => u.id === initUser.id);
         if (!found) {
           store.put(initUser);
-        } else if (!found.employeeId || found.designation !== initUser.designation) {
-          // Sync new employeeId or designation while preserving any custom saved password / signature
+        } else if (
+          !found.employeeId ||
+          found.name !== initUser.name ||
+          found.designation !== initUser.designation
+        ) {
+          // Sync new name, employeeId or designation while preserving any custom saved password / signature
           store.put({
             ...found,
             employeeId: initUser.employeeId,
@@ -667,6 +674,11 @@ export function createDefaultSopForUser(user: UserProfile): SOPDocument {
     updatedAt: now,
     header: {
       ...defaultSopData.header,
+      processName: '',
+      model: '',
+      stationLine: '',
+      referenceNo: '',
+      reasonOfChanges: '',
       preparedBy: {
         name: user.name,
         designation: user.designation,
@@ -675,8 +687,8 @@ export function createDefaultSopForUser(user: UserProfile): SOPDocument {
         signatureImg: user.defaultSignatureImg || '',
       },
       checkedBy: {
-        name: 'Sazzad',
-        designation: 'Process Engineer / Section In-Charge',
+        name: 'Sazzad (50463)',
+        designation: 'Process Automation Lead',
         signatureImg: '',
       },
       approvedBy: {
@@ -685,8 +697,11 @@ export function createDefaultSopForUser(user: UserProfile): SOPDocument {
         signatureImg: '',
       },
     },
+    photos: [], // clean empty photos
     procedure: {
       ...defaultSopData.procedure,
+      banglishInput: '',
+      qualityBanglishInput: '',
       steps: [], // clean empty procedure
     },
     auditTrail: [
@@ -710,6 +725,14 @@ export async function getUserWorkingDraft(userId: string): Promise<SOPDocument |
     if (raw) {
       const parsed: SOPDocument = JSON.parse(raw);
       if (parsed) {
+        // Auto-sanitize legacy trial BOPP tape drafts so panels open completely blank
+        if (
+          parsed.header?.processName?.includes('BOPP Tape') ||
+          (parsed.photos && parsed.photos.some((p) => p.url?.includes('Tape Dispenser') || p.name?.includes('Pasted Image')))
+        ) {
+          localStorage.removeItem(USER_DRAFT_PREFIX + userId);
+          return null;
+        }
         return parsed;
       }
     }
@@ -725,14 +748,54 @@ export async function getUserWorkingDraft(userId: string): Promise<SOPDocument |
         s.authorId === userId ||
         (s.header?.preparedBy?.name && s.header.preparedBy.name.toLowerCase().includes(userId.toLowerCase()))
     );
-    if (userSops.length > 0) {
-      return userSops[0];
+    // Ignore legacy trial BOPP tape SOPs
+    const cleanSops = userSops.filter((s) => !s.header?.processName?.includes('BOPP Tape'));
+    if (cleanSops.length > 0) {
+      return cleanSops[0];
     }
   } catch (e) {
     console.warn('IndexedDB user SOP lookup failed', e);
   }
 
   return null;
+}
+
+// Clear trial SOPs and reset analytics/drafts
+export async function clearTrialData(): Promise<{ sopsDeleted: number }> {
+  let sopsDeleted = 0;
+  try {
+    const db = await openDatabase();
+    const all = await getAllSOPs();
+    await new Promise<void>((resolve) => {
+      const tx = db.transaction(STORE_SOPS, 'readwrite');
+      const store = tx.objectStore(STORE_SOPS);
+      all.forEach((s) => {
+        if (s.id) {
+          store.delete(s.id);
+          sopsDeleted++;
+        }
+      });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    });
+  } catch (e) {
+    console.warn('Clear trial IndexedDB error:', e);
+  }
+
+  try {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith(USER_DRAFT_PREFIX) || k.startsWith('walton_sop_draft_'))) {
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+  } catch (e) {
+    console.warn('Clear trial localStorage error:', e);
+  }
+
+  return { sopsDeleted };
 }
 
 export async function saveUserWorkingDraft(userId: string, doc: SOPDocument): Promise<void> {

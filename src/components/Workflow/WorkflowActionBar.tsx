@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { UserProfile } from '../../types/auth';
 import type { SOPDocument } from '../../types/sop';
@@ -8,7 +8,7 @@ import {
   forwardToApprover,
   approveSOP,
   rejectSOP,
-  INITIAL_USERS,
+  getAllUsers,
 } from '../../services/storageService';
 import confetti from 'canvas-confetti';
 import {
@@ -21,6 +21,7 @@ import {
   Upload,
   X,
   ArrowRight,
+  FilePlus,
 } from 'lucide-react';
 
 interface WorkflowActionBarProps {
@@ -29,6 +30,8 @@ interface WorkflowActionBarProps {
   onUpdateSop: (updated: SOPDocument) => void;
   onOpenWorkspace: () => void;
   onOpenLogin: () => void;
+  onNewSop?: () => void;
+  onResetSop?: () => void;
 }
 
 export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
@@ -37,6 +40,8 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
   onUpdateSop,
   onOpenWorkspace,
   onOpenLogin,
+  onNewSop,
+  onResetSop,
 }) => {
   const [isForwardModalOpen, setIsForwardModalOpen] = useState<boolean>(false);
   const [selectedCheckerId, setSelectedCheckerId] = useState<string>('Sazzad');
@@ -45,11 +50,22 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
   const [signInput, setSignInput] = useState<string>('');
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
   const [rejectReason, setRejectReason] = useState<string>('');
+  const [checkers, setCheckers] = useState<UserProfile[]>([]);
 
   const status = currentSop.status || 'draft';
 
-  // Available Checkers list
-  const checkers = INITIAL_USERS.filter((u) => u.role === 'checked_by');
+  // Load available checkers dynamically from DB
+  useEffect(() => {
+    getAllUsers().then((list) => {
+      const active = list.filter((u) => u.role === 'checked_by');
+      setCheckers(active);
+      if (active.some((c) => c.id === 'Sazzad')) {
+        setSelectedCheckerId('Sazzad');
+      } else if (active.length > 0) {
+        setSelectedCheckerId(active[0].id);
+      }
+    });
+  }, [isForwardModalOpen]);
 
   // Handle Save to Archive
   const handleSaveArchive = async () => {
@@ -373,6 +389,32 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
               <span>ফেরত</span>
             </button>
           </>
+        )}
+
+        {/* Create New SOP button (Available for everyone) */}
+        {onNewSop && (
+          <button
+            type="button"
+            onClick={onNewSop}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500 rounded-xl font-bold transition cursor-pointer shadow-xs active:scale-95"
+            title="নতুন সম্পূর্ণ ব্ল্যাঙ্ক SOP তৈরি করুন"
+          >
+            <FilePlus className="w-3.5 h-3.5" />
+            <span>+ নতুন SOP</span>
+          </button>
+        )}
+
+        {/* Reset SOP content button (Available for everyone) */}
+        {onResetSop && (
+          <button
+            type="button"
+            onClick={onResetSop}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl font-bold transition cursor-pointer shadow-xs"
+            title="বর্তমান SOP-এর সব ফিল্ড ও ছবি রিসেট করে খালি করুন"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-rose-600" />
+            <span>রিসেট</span>
+          </button>
         )}
 
         {/* Personal Workspace button */}

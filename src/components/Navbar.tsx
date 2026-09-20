@@ -17,6 +17,8 @@ import {
   ShieldAlert,
   Bell,
   ArrowRight,
+  FilePlus,
+  RotateCcw,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -39,6 +41,8 @@ interface NavbarProps {
   onAutoGenerate: () => void;
   isGenerating: boolean;
   isDownloadingPdf?: boolean;
+  onNewSop?: () => void;
+  onResetSop?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -61,6 +65,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onAutoGenerate,
   isGenerating,
   isDownloadingPdf = false,
+  onNewSop,
+  onResetSop,
 }) => {
   const [isNotifOpen, setIsNotifOpen] = useState<boolean>(false);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -133,8 +139,32 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Center: AI Trigger Button */}
+      {/* Center: New SOP & AI Trigger Buttons */}
       <div className="flex items-center gap-2">
+        {onNewSop && (
+          <button
+            type="button"
+            onClick={onNewSop}
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-md transition cursor-pointer active:scale-95"
+            title="নতুন সম্পূর্ণ ব্ল্যাঙ্ক SOP তৈরি করুন"
+          >
+            <FilePlus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">+ নতুন SOP</span>
+          </button>
+        )}
+
+        {onResetSop && (
+          <button
+            type="button"
+            onClick={onResetSop}
+            className="flex items-center gap-1.5 bg-slate-800 hover:bg-rose-950 text-rose-300 border border-slate-700 hover:border-rose-700 px-2.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
+            title="বর্তমান SOP রিসেট করে সম্পূর্ণ খালি করুন"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-rose-400" />
+            <span className="hidden sm:inline">রিসেট</span>
+          </button>
+        )}
+
         <button
           onClick={onAutoGenerate}
           disabled={isGenerating}

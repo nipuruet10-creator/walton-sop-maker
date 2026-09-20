@@ -77,7 +77,6 @@ export const defaultSopData: SOPDocument = {
     { sl: 1, name: '', effectiveRange: '' },
     { sl: 2, name: '', effectiveRange: '' },
     { sl: 3, name: '', effectiveRange: '' },
-    { sl: 4, name: '', effectiveRange: '' },
   ],
   stepFontSize: 'auto',
   qualityFontSize: 'auto',

@@ -426,7 +426,8 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
   // Apply Crop and resize canvas
   const handleApplyCrop = () => {
     const canvas = canvasRef.current;
-    if (!canvas || !cropSelection) return;
+    const img = imageRef.current;
+    if (!canvas || !img || !cropSelection) return;
 
     const x = Math.max(0, Math.min(cropSelection.startX, cropSelection.endX));
     const y = Math.max(0, Math.min(cropSelection.startY, cropSelection.endY));
@@ -533,8 +534,45 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
 
   const handleSave = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    // Export high-quality image with annotations
+    const img = imageRef.current;
+    if (!canvas || !img) return;
+
+    // If there is an active crop selection, automatically crop to only the selected region!
+    if (cropSelection) {
+      const x = Math.max(0, Math.min(cropSelection.startX, cropSelection.endX));
+      const y = Math.max(0, Math.min(cropSelection.startY, cropSelection.endY));
+      const w = Math.min(canvas.width - x, Math.abs(cropSelection.endX - cropSelection.startX));
+      const h = Math.min(canvas.height - y, Math.abs(cropSelection.endY - cropSelection.startY));
+
+      if (w >= 15 && h >= 15) {
+        // Redraw cleanly without any crop overlay / dark masking
+        redrawCanvas(history, null, null);
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = Math.round(w);
+        cropCanvas.height = Math.round(h);
+        const cropCtx = cropCanvas.getContext('2d');
+        if (cropCtx) {
+          cropCtx.drawImage(
+            canvas,
+            Math.round(x),
+            Math.round(y),
+            Math.round(w),
+            Math.round(h),
+            0,
+            0,
+            Math.round(w),
+            Math.round(h)
+          );
+          const croppedBase64 = cropCanvas.toDataURL('image/jpeg', 0.95);
+          onSave(croppedBase64);
+          onClose();
+          return;
+        }
+      }
+    }
+
+    // Normal save: ensure canvas is completely clean of any crop overlay or dark masking
+    redrawCanvas(history, null, null);
     const annotatedBase64 = canvas.toDataURL('image/jpeg', 0.95);
     onSave(annotatedBase64);
     onClose();
