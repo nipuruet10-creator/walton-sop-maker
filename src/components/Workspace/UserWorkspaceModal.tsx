@@ -9,6 +9,7 @@ import {
   exportUserWorkspaceBackup,
   importUserWorkspaceBackup,
   syncUserDraftWithCloud,
+  pullAllSopsFromCloud,
 } from '../../services/storageService';
 import {
   FileText,
@@ -125,10 +126,22 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
     if (currentUser.role === 'admin') {
       return doc.status === 'forwarded_to_checker' || doc.status === 'forwarded_to_approver';
     }
+    if (currentUser.role === 'prepared_by') {
+      // Prepared By can track all their SOPs currently pending under Sazzad or Kamrul
+      return (
+        (doc.authorId === currentUser.id ||
+          doc.authorName === currentUser.name ||
+          (doc.header.preparedBy?.name && doc.header.preparedBy.name.toLowerCase().includes(currentUser.name.toLowerCase()))) &&
+        (doc.status === 'forwarded_to_checker' || doc.status === 'forwarded_to_approver')
+      );
+    }
     if (currentUser.role === 'checked_by') {
       return (
         doc.status === 'forwarded_to_checker' &&
-        (!doc.checkedById || doc.checkedById === currentUser.id)
+        (!doc.checkedById ||
+          doc.checkedById === currentUser.id ||
+          currentUser.id === 'Sazzad' ||
+          (doc.checkedByName && doc.checkedByName.includes('Sazzad')))
       );
     }
     if (currentUser.role === 'approved_by') {
@@ -229,12 +242,13 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
     if (!currentUser) return;
     setIsSyncing(true);
     try {
+      await pullAllSopsFromCloud();
       const syncedDoc = await syncUserDraftWithCloud(currentUser.id);
       if (syncedDoc) {
         onSelectSop(syncedDoc);
-        alert('ক্লাউড থেকে সফলভাবে আপনার সর্বশেষ কাজ লোড করা হয়েছে!');
+        alert('ক্লাউড থেকে সফলভাবে আপনার সর্বশেষ কাজ ও সমস্ত পেন্ডিং অনুমোদন লোড করা হয়েছে!');
       } else {
-        alert('ক্লাউড সিঙ্ক সম্পন্ন হয়েছে (ডাটাবেস আপ-টু-ডেট আছে)।');
+        alert('ক্লাউড সিঙ্ক সম্পন্ন হয়েছে (ডাটাবেজ আপ-টু-ডেট আছে)।');
       }
       await fetchDocs();
     } catch {
@@ -387,20 +401,22 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
               <span>অনুমোদিত SOP সমূহ ({approvedSops.length})</span>
             </button>
 
-            {(currentUser.role === 'checked_by' || currentUser.role === 'approved_by' || currentUser.role === 'admin') && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('pending_queue')}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
-                  activeTab === 'pending_queue'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
-                }`}
-              >
-                <Inbox className="w-3.5 h-3.5" />
-                <span>মুলতবি তালিকা (Queue: {pendingQueue.length})</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setActiveTab('pending_queue')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold transition cursor-pointer ${
+                activeTab === 'pending_queue'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
+              }`}
+            >
+              <Inbox className="w-3.5 h-3.5" />
+              <span>
+                {currentUser.role === 'prepared_by'
+                  ? `পর্যালোচনায় পাঠানো (${pendingQueue.length})`
+                  : `মুলতবি তালিকা (Queue: ${pendingQueue.length})`}
+              </span>
+            </button>
           </div>
 
           {/* Search Box */}
@@ -455,11 +471,25 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
                     <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
                       <span>মডেল: <strong className="text-slate-700">{doc.header.model || '-'}</strong></span>
                       <span>•</span>
-                      <span>স্টেশন: <strong className="text-slate-700">{doc.header.stationLine || '-'}</strong></span>
+                      <span>প্রস্তুতকারী: <strong className="text-slate-700">{doc.authorName || doc.header.preparedBy.name || '-'}</strong></span>
                       <span>•</span>
-                      <span>ছবি: <strong>{doc.photos.length}টি</strong></span>
-                      <span>•</span>
-                      <span>তারিখ: {doc.updatedAt ? new Date(doc.updatedAt).toLocaleDateString() : '-'}</span>
+                      {doc.status === 'forwarded_to_checker' && (
+                        <>
+                          <span className="text-blue-600 font-medium">
+                            পেন্ডিং পর্যালোচক: <strong>{doc.checkedByName || 'Sazzad (50463)'}</strong>
+                          </span>
+                          <span>•</span>
+                        </>
+                      )}
+                      {doc.status === 'forwarded_to_approver' && (
+                        <>
+                          <span className="text-purple-600 font-medium">
+                            পেন্ডিং অনুমোদনকারী: <strong>{doc.approvedByName || 'Kamrul (44819)'}</strong>
+                          </span>
+                          <span>•</span>
+                        </>
+                      )}
+                      <span>তারিখ: {doc.updatedAt ? new Date(doc.updatedAt).toLocaleDateString('bn-BD') : '-'}</span>
                     </div>
 
                     {doc.rejectionReason && (

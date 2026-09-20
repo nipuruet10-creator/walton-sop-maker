@@ -560,24 +560,49 @@ export function setActiveUserSession(user: UserProfile | null): void {
 
 // ==================== SOP STORAGE & WORKFLOW METHODS ====================
 
-export async function getAllSOPs(): Promise<SOPDocument[]> {
+export async function getAllSOPs(skipCloudSync: boolean = false): Promise<SOPDocument[]> {
+  let localResults: SOPDocument[] = [];
   try {
     const db = await openDatabase();
-    return new Promise((resolve) => {
+    localResults = await new Promise((resolve) => {
       const tx = db.transaction(STORE_SOPS, 'readonly');
       const store = tx.objectStore(STORE_SOPS);
       const req = store.getAll();
       req.onsuccess = () => {
-        const results = req.result as SOPDocument[];
-        // Sort newest first
-        results.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
-        resolve(results);
+        resolve((req.result as SOPDocument[]) || []);
       };
       req.onerror = () => resolve([]);
     });
   } catch {
-    return [];
+    localResults = [];
   }
+
+  // Pull latest from cloud and merge
+  if (!skipCloudSync) {
+    try {
+      const cloudSops = await pullAllSopsFromCloud();
+      if (cloudSops && cloudSops.length > 0) {
+        const map = new Map<string, SOPDocument>();
+        localResults.forEach((s: SOPDocument) => {
+          if (s && s.id) map.set(s.id, s);
+        });
+        cloudSops.forEach((s: SOPDocument) => {
+          if (s && s.id) {
+            const existing = map.get(s.id);
+            if (!existing || new Date(s.updatedAt || 0) >= new Date(existing.updatedAt || 0)) {
+              map.set(s.id, s);
+            }
+          }
+        });
+        const combined = Array.from(map.values());
+        combined.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+        return combined;
+      }
+    } catch {}
+  }
+
+  localResults.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+  return localResults;
 }
 
 export async function getSOPById(id: string): Promise<SOPDocument | null> {
@@ -637,13 +662,19 @@ export async function saveSOP(doc: SOPDocument, user?: UserProfile, note?: strin
     console.warn('IndexedDB save failed, falling back:', err);
   }
 
+  // Push to cloud in background
+  try {
+    pushSopToCloud(updatedDoc).catch(() => {});
+  } catch {}
+
   return updatedDoc;
 }
 
 export async function deleteSOP(id: string): Promise<boolean> {
+  let ok = false;
   try {
     const db = await openDatabase();
-    return new Promise((resolve) => {
+    ok = await new Promise((resolve) => {
       const tx = db.transaction(STORE_SOPS, 'readwrite');
       const store = tx.objectStore(STORE_SOPS);
       const req = store.delete(id);
@@ -651,8 +682,15 @@ export async function deleteSOP(id: string): Promise<boolean> {
       req.onerror = () => resolve(false);
     });
   } catch {
-    return false;
+    ok = false;
   }
+
+  // Also remove from cloud
+  try {
+    deleteSopFromCloud(id).catch(() => {});
+  } catch {}
+
+  return ok;
 }
 
 // ==================== PER-USER WORKSPACE & CROSS-PC DRAFTS ====================
@@ -731,18 +769,28 @@ export async function getUserWorkingDraft(userId: string): Promise<SOPDocument |
           (parsed.photos && parsed.photos.some((p) => p.url?.includes('Tape Dispenser') || p.name?.includes('Pasted Image')))
         ) {
           localStorage.removeItem(USER_DRAFT_PREFIX + userId);
-          return null;
+        } else {
+          return parsed;
         }
-        return parsed;
       }
     }
   } catch (e) {
     console.warn('Draft localStorage read failed', e);
   }
 
-  // 2. Check IndexedDB for existing SOPs of this user
+  // 2. Fetch latest draft from Cloud if switching PCs
   try {
-    const allSOPs = await getAllSOPs();
+    const cloudDraft = await syncUserDraftWithCloud(userId);
+    if (cloudDraft) {
+      return cloudDraft;
+    }
+  } catch (e) {
+    console.warn('Draft cloud read failed', e);
+  }
+
+  // 3. Check IndexedDB for existing SOPs of this user
+  try {
+    const allSOPs = await getAllSOPs(true);
     const userSops = allSOPs.filter(
       (s) =>
         s.authorId === userId ||
@@ -828,46 +876,335 @@ export async function saveUserWorkingDraft(userId: string, doc: SOPDocument): Pr
   } catch {}
 }
 
-// Multi-PC Cloud Sync Endpoint Configuration
+// ==================== MULTI-PC CLOUD SYNC & REPLICATION ENGINE ====================
+
+export interface CloudSyncConfig {
+  firebaseUrl: string;
+  syncEndpoint: string;
+  autoSync: boolean;
+  lastSyncTime?: string;
+  status?: 'idle' | 'syncing' | 'connected' | 'error';
+  lastError?: string;
+}
+
+const CLOUD_CONFIG_KEY = 'walton_sop_cloud_config_v2';
 const CLOUD_SYNC_URL_KEY = 'walton_sop_cloud_sync_url';
 
+export function getCloudSyncConfig(): CloudSyncConfig {
+  try {
+    const raw = localStorage.getItem(CLOUD_CONFIG_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        firebaseUrl: parsed.firebaseUrl || '',
+        syncEndpoint: parsed.syncEndpoint || '/api/sync',
+        autoSync: parsed.autoSync !== false,
+        lastSyncTime: parsed.lastSyncTime || undefined,
+        status: parsed.status || 'idle',
+        lastError: parsed.lastError || undefined,
+      };
+    }
+  } catch {}
+
+  const legacyUrl = localStorage.getItem(CLOUD_SYNC_URL_KEY) || '';
+  return {
+    firebaseUrl: legacyUrl.includes('firebaseio.com') ? legacyUrl : '',
+    syncEndpoint: '/api/sync',
+    autoSync: true,
+    status: 'idle',
+  };
+}
+
+export function saveCloudSyncConfig(cfg: Partial<CloudSyncConfig>): CloudSyncConfig {
+  const current = getCloudSyncConfig();
+  const updated: CloudSyncConfig = {
+    ...current,
+    ...cfg,
+  };
+  try {
+    localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify(updated));
+    if (updated.firebaseUrl) {
+      localStorage.setItem(CLOUD_SYNC_URL_KEY, updated.firebaseUrl);
+    }
+  } catch (e) {
+    console.warn('Failed to save cloud sync config:', e);
+  }
+  return updated;
+}
+
 export function getCloudSyncUrl(): string {
-  return localStorage.getItem(CLOUD_SYNC_URL_KEY) || '/api/sync';
+  const cfg = getCloudSyncConfig();
+  return cfg.firebaseUrl || cfg.syncEndpoint || '/api/sync';
 }
 
 export function setCloudSyncUrl(url: string): void {
-  localStorage.setItem(CLOUD_SYNC_URL_KEY, url.trim());
+  const trimmed = url.trim();
+  if (trimmed.includes('firebaseio.com')) {
+    saveCloudSyncConfig({ firebaseUrl: trimmed });
+  } else {
+    saveCloudSyncConfig({ syncEndpoint: trimmed });
+  }
 }
 
-export async function syncUserDraftWithCloud(userId: string, doc?: SOPDocument): Promise<SOPDocument | null> {
-  const syncUrl = getCloudSyncUrl();
+export async function testCloudConnection(customUrl?: string): Promise<{ success: boolean; backend: string; message: string }> {
+  const config = getCloudSyncConfig();
+  const firebaseUrl = (customUrl !== undefined ? customUrl : config.firebaseUrl).trim();
+
+  // 1. Direct Firebase ping test if URL provided
+  if (firebaseUrl && firebaseUrl.includes('firebaseio.com')) {
+    const cleanUrl = firebaseUrl.replace(/\/$/, '');
+    try {
+      const res = await fetch(`${cleanUrl}/_test_ping.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ping: 'pong', timestamp: new Date().toISOString() }),
+      });
+      if (res.ok) {
+        saveCloudSyncConfig({ status: 'connected', lastError: undefined });
+        return {
+          success: true,
+          backend: 'firebase_direct',
+          message: 'Google Firebase Realtime Database এর সাথে সরাসরি সংযোগ সফল হয়েছে!',
+        };
+      }
+    } catch {}
+  }
+
+  // 2. Test via Vercel /api/sync endpoint
   try {
-    if (doc) {
-      // Push draft to cloud
-      const res = await fetch(`${syncUrl}?userId=${encodeURIComponent(userId)}`, {
-        method: 'POST',
+    const res = await fetch(`${config.syncEndpoint}?action=testConnection`, {
+      headers: {
+        ...(firebaseUrl ? { 'x-cloud-sync-url': firebaseUrl } : {}),
+      },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      saveCloudSyncConfig({ status: 'connected', lastError: undefined });
+      return {
+        success: data.success ?? true,
+        backend: data.backend || 'serverless_relay',
+        message: data.message || 'ক্লাউড সিঙ্ক সার্ভারের সাথে সফলভাবে যোগাযোগ স্থাপিত হয়েছে!',
+      };
+    }
+  } catch {}
+
+  saveCloudSyncConfig({ status: 'error', lastError: 'কানেকশন ব্যর্থ হয়েছে' });
+  return {
+    success: false,
+    backend: 'none',
+    message: 'ক্লাউড কানেকশন স্থাপন করা যায়নি। Firebase Database URL সঠিক কিনা যাচাই করুন।',
+  };
+}
+
+export async function pushSopToCloud(doc: SOPDocument): Promise<boolean> {
+  if (!doc || !doc.id) return false;
+  const config = getCloudSyncConfig();
+  if (!config.autoSync) return false;
+
+  let pushed = false;
+
+  // 1. Try Vercel Serverless proxy /api/sync
+  try {
+    const res = await fetch(`${config.syncEndpoint}?action=saveSop`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(config.firebaseUrl ? { 'x-cloud-sync-url': config.firebaseUrl } : {}),
+      },
+      body: JSON.stringify(doc),
+    });
+    if (res.ok) {
+      pushed = true;
+    }
+  } catch {}
+
+  // 2. Direct fallback to Firebase if configured
+  if (!pushed && config.firebaseUrl && config.firebaseUrl.includes('firebaseio.com')) {
+    try {
+      const cleanFbUrl = config.firebaseUrl.replace(/\/$/, '');
+      const res = await fetch(`${cleanFbUrl}/sops/${doc.id}.json`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(doc),
       });
-      if (res.ok) {
-        const json = await res.json();
-        return json.doc || doc;
-      }
-    } else {
-      // Pull draft from cloud
-      const res = await fetch(`${syncUrl}?userId=${encodeURIComponent(userId)}`);
-      if (res.ok) {
-        const json = await res.json();
-        if (json.doc) {
-          localStorage.setItem(USER_DRAFT_PREFIX + userId, JSON.stringify(json.doc));
-          return json.doc;
-        }
+      if (res.ok) pushed = true;
+    } catch (e) {
+      console.warn('Direct Firebase push failed:', e);
+    }
+  }
+
+  if (pushed) {
+    saveCloudSyncConfig({ lastSyncTime: new Date().toISOString(), status: 'connected' });
+  }
+
+  return pushed;
+}
+
+export async function pullAllSopsFromCloud(): Promise<SOPDocument[]> {
+  const config = getCloudSyncConfig();
+  let sops: SOPDocument[] = [];
+
+  // 1. Try /api/sync
+  try {
+    const endpoint = `${config.syncEndpoint}?action=getAllSOPs${
+      config.firebaseUrl ? `&cloudUrl=${encodeURIComponent(config.firebaseUrl)}` : ''
+    }`;
+    const res = await fetch(endpoint, {
+      headers: {
+        ...(config.firebaseUrl ? { 'x-cloud-sync-url': config.firebaseUrl } : {}),
+      },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.sops)) {
+        sops = data.sops;
       }
     }
-  } catch {
-    // Silent fallback to local storage
+  } catch {}
+
+  // 2. Direct fallback to Firebase if configured
+  if (sops.length === 0 && config.firebaseUrl && config.firebaseUrl.includes('firebaseio.com')) {
+    try {
+      const cleanFbUrl = config.firebaseUrl.replace(/\/$/, '');
+      const res = await fetch(`${cleanFbUrl}/sops.json`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && typeof data === 'object') {
+          sops = Object.values(data).filter(Boolean) as SOPDocument[];
+        }
+      }
+    } catch (e) {
+      console.warn('Direct Firebase pull failed:', e);
+    }
   }
-  return null;
+
+  // Persist pulled SOPs to local IndexedDB to guarantee offline availability
+  if (sops.length > 0) {
+    try {
+      const db = await openDatabase();
+      const tx = db.transaction(STORE_SOPS, 'readwrite');
+      const store = tx.objectStore(STORE_SOPS);
+      for (const s of sops) {
+        if (s && s.id) {
+          store.put(s);
+        }
+      }
+      saveCloudSyncConfig({ lastSyncTime: new Date().toISOString(), status: 'connected' });
+    } catch {}
+  }
+
+  return sops;
+}
+
+export async function deleteSopFromCloud(id: string): Promise<boolean> {
+  const config = getCloudSyncConfig();
+  let ok = false;
+  try {
+    const res = await fetch(`${config.syncEndpoint}?action=deleteSop&id=${encodeURIComponent(id)}`, {
+      method: 'POST',
+      headers: {
+        ...(config.firebaseUrl ? { 'x-cloud-sync-url': config.firebaseUrl } : {}),
+      },
+    });
+    if (res.ok) ok = true;
+  } catch {}
+
+  if (config.firebaseUrl && config.firebaseUrl.includes('firebaseio.com')) {
+    try {
+      const cleanFbUrl = config.firebaseUrl.replace(/\/$/, '');
+      await fetch(`${cleanFbUrl}/sops/${id}.json`, { method: 'DELETE' });
+      ok = true;
+    } catch {}
+  }
+  return ok;
+}
+
+export async function pushAllLocalSopsToCloud(): Promise<{ count: number; success: boolean }> {
+  try {
+    const localSops = await getAllSOPs(true);
+    let count = 0;
+    for (const s of localSops) {
+      const ok = await pushSopToCloud(s);
+      if (ok) count++;
+    }
+    return { count, success: true };
+  } catch {
+    return { count: 0, success: false };
+  }
+}
+
+export async function syncUserDraftWithCloud(userId: string, doc?: SOPDocument): Promise<SOPDocument | null> {
+  if (!userId) return null;
+  const config = getCloudSyncConfig();
+
+  if (doc) {
+    // Push draft to cloud
+    try {
+      await fetch(`${config.syncEndpoint}?action=saveDraft&userId=${encodeURIComponent(userId)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(config.firebaseUrl ? { 'x-cloud-sync-url': config.firebaseUrl } : {}),
+        },
+        body: JSON.stringify(doc),
+      });
+    } catch {}
+
+    if (config.firebaseUrl && config.firebaseUrl.includes('firebaseio.com')) {
+      try {
+        const cleanFbUrl = config.firebaseUrl.replace(/\/$/, '');
+        await fetch(`${cleanFbUrl}/drafts/${encodeURIComponent(userId)}.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(doc),
+        });
+      } catch {}
+    }
+    return doc;
+  } else {
+    // Pull draft from cloud
+    let pulledDoc: SOPDocument | null = null;
+    try {
+      const res = await fetch(`${config.syncEndpoint}?action=getDraft&userId=${encodeURIComponent(userId)}`, {
+        headers: {
+          ...(config.firebaseUrl ? { 'x-cloud-sync-url': config.firebaseUrl } : {}),
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.doc && typeof data.doc === 'object' && data.doc.header) {
+          pulledDoc = data.doc as SOPDocument;
+        }
+      }
+    } catch {}
+
+    if (!pulledDoc && config.firebaseUrl && config.firebaseUrl.includes('firebaseio.com')) {
+      try {
+        const cleanFbUrl = config.firebaseUrl.replace(/\/$/, '');
+        const res = await fetch(`${cleanFbUrl}/drafts/${encodeURIComponent(userId)}.json`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && typeof data === 'object' && data.header) {
+            pulledDoc = data as SOPDocument;
+          }
+        }
+      } catch {}
+    }
+
+    if (pulledDoc) {
+      if (
+        pulledDoc.header?.processName?.includes('BOPP Tape') ||
+        (pulledDoc.photos && pulledDoc.photos.some((p: any) => p.url?.includes('Tape Dispenser') || p.name?.includes('Pasted Image')))
+      ) {
+        return null;
+      }
+      try {
+        localStorage.setItem(USER_DRAFT_PREFIX + userId, JSON.stringify(pulledDoc));
+      } catch {}
+      return pulledDoc;
+    }
+    return null;
+  }
 }
 
 // 1-Click Export of all user's drafts and data for transferring to another PC

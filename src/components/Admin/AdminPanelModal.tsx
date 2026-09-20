@@ -12,8 +12,12 @@ import {
   getGlobalAiConfig,
   saveGlobalAiConfig,
   type GlobalAiConfig,
-  getCloudSyncUrl,
-  setCloudSyncUrl,
+  getCloudSyncConfig,
+  saveCloudSyncConfig,
+  testCloudConnection,
+  pushAllLocalSopsToCloud,
+  pullAllSopsFromCloud,
+  type CloudSyncConfig,
   clearTrialData,
 } from '../../services/storageService';
 import {
@@ -43,7 +47,10 @@ import {
   CheckCircle2,
   AlertCircle,
   ExternalLink,
-  Laptop,
+  Cloud,
+  CloudLightning,
+  Globe,
+  Database,
 } from 'lucide-react';
 
 interface AdminPanelModalProps {
@@ -53,7 +60,7 @@ interface AdminPanelModalProps {
 }
 
 export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClose, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'routing' | 'ai' | 'users' | 'backup'>('routing');
+  const [activeTab, setActiveTab] = useState<'routing' | 'ai' | 'users' | 'sync' | 'backup'>('routing');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [selectedUserForReset, setSelectedUserForReset] = useState<UserProfile | null>(null);
   const [newPassword, setNewPassword] = useState<string>('');
@@ -90,14 +97,60 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
   const [editDesignation, setEditDesignation] = useState<string>('');
   const [editDepartment, setEditDepartment] = useState<string>('');
 
-  // Multi-PC Cloud Sync settings
-  const [syncUrl, setSyncUrl] = useState<string>(getCloudSyncUrl);
-  const [syncSavedMsg, setSyncSavedMsg] = useState<string | null>(null);
+  // Multi-PC Cloud Sync State & Operations
+  const [syncConfig, setSyncConfig] = useState<CloudSyncConfig>(getCloudSyncConfig);
+  const [isTestingSync, setIsTestingSync] = useState<boolean>(false);
+  const [syncTestResult, setSyncTestResult] = useState<{ success: boolean; message: string; backend?: string } | null>(null);
+  const [isPushingCloud, setIsPushingCloud] = useState<boolean>(false);
+  const [isPullingCloud, setIsPullingCloud] = useState<boolean>(false);
 
-  const handleSaveSyncUrl = () => {
-    setCloudSyncUrl(syncUrl);
-    setSyncSavedMsg('ক্লাউড সিঙ্ক URL সফলভাবে সংরক্ষিত হয়েছে!');
-    setTimeout(() => setSyncSavedMsg(null), 3500);
+  const handleSaveCloudConfig = (updated: Partial<CloudSyncConfig>) => {
+    const res = saveCloudSyncConfig(updated);
+    setSyncConfig(res);
+    setSuccessMsg('ক্লাউড সিঙ্ক সেটিংস সফলভাবে সংরক্ষিত হয়েছে!');
+    setTimeout(() => setSuccessMsg(null), 3500);
+  };
+
+  const handleTestCloudConnection = async () => {
+    setIsTestingSync(true);
+    setSyncTestResult(null);
+    try {
+      const res = await testCloudConnection(syncConfig.firebaseUrl);
+      setSyncTestResult(res);
+      setSyncConfig(getCloudSyncConfig());
+    } catch (e: any) {
+      setSyncTestResult({ success: false, message: 'কানেকশন এরর: ' + e.message });
+    } finally {
+      setIsTestingSync(false);
+    }
+  };
+
+  const handlePushAllToCloud = async () => {
+    setIsPushingCloud(true);
+    try {
+      const res = await pushAllLocalSopsToCloud();
+      setSuccessMsg(`সফল! ${res.count} টি লোকাল SOP ক্লাউডে আপলোড করা হয়েছে।`);
+      setTimeout(() => setSuccessMsg(null), 3500);
+      setSyncConfig(getCloudSyncConfig());
+    } catch (e: any) {
+      alert('ক্লাউডে আপলোড ব্যর্থ: ' + e.message);
+    } finally {
+      setIsPushingCloud(false);
+    }
+  };
+
+  const handlePullAllFromCloud = async () => {
+    setIsPullingCloud(true);
+    try {
+      const sops = await pullAllSopsFromCloud();
+      setSuccessMsg(`সফল! ক্লাউড থেকে ${sops.length} টি SOP ও পেন্ডিং অনুমোদন সিঙ্ক হয়েছে।`);
+      setTimeout(() => setSuccessMsg(null), 3500);
+      setSyncConfig(getCloudSyncConfig());
+    } catch (e: any) {
+      alert('ক্লাউড থেকে সিঙ্ক ব্যর্থ: ' + e.message);
+    } finally {
+      setIsPullingCloud(false);
+    }
   };
 
   const fetchUsers = async () => {
@@ -108,7 +161,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
   useEffect(() => {
     if (isOpen) {
       fetchUsers();
-      setSyncUrl(getCloudSyncUrl());
+      setSyncConfig(getCloudSyncConfig());
       const currentConfig = getGlobalAiConfig();
       setAiConfig(currentConfig);
       if (currentConfig.openRouterKey) {
@@ -454,6 +507,19 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
             >
               <Users className="w-3.5 h-3.5" />
               <span>ইউজার ও পাসওয়ার্ড ({users.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('sync')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer whitespace-nowrap ${
+                activeTab === 'sync'
+                  ? 'bg-rose-800 text-white shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <Cloud className="w-3.5 h-3.5 text-sky-400" />
+              <span>ক্লাউড সিঙ্ক (Multi-PC)</span>
             </button>
 
             <button
@@ -1001,7 +1067,219 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
             </div>
           )}
 
-          {/* TAB 4: MASTER BACKUP & RESTORE */}
+          {/* TAB 4: MULTI-PC CLOUD SYNC & REPLICATION */}
+          {activeTab === 'sync' && (
+            <div className="space-y-5 max-w-3xl mx-auto py-6">
+              {/* Status Banner */}
+              <div className="bg-gradient-to-r from-slate-900 to-slate-950 rounded-2xl p-5 border border-slate-800 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-md">
+                <div className="flex items-center gap-3.5">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                    syncConfig.firebaseUrl ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'bg-slate-800 text-slate-400 border border-slate-700'
+                  }`}>
+                    <CloudLightning className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold tracking-tight">মাল্টি-পিসি ক্লাউড রেপ্লিকেশন ইঞ্জিন</h3>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border ${
+                        syncConfig.firebaseUrl
+                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                          : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${syncConfig.firebaseUrl ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                        {syncConfig.firebaseUrl ? 'ক্লাউড সিঙ্ক সক্রিয় (Online)' : 'লোকাল মোড (Standalone)'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      বিপ্লব (PC-1), সাজ্জাদ (PC-2), ও কামরুল (PC-3) সহ ফ্যাক্টরির যে কোনো কম্পিউটার থেকে রিয়েল-টাইম অটোমেটিক সিঙ্ক।
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveCloudConfig({ autoSync: !syncConfig.autoSync })}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border ${
+                      syncConfig.autoSync
+                        ? 'bg-emerald-600/30 text-emerald-300 border-emerald-500/40 hover:bg-emerald-600/40'
+                        : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                    }`}
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${syncConfig.autoSync ? 'animate-spin' : ''}`} />
+                    <span>অটো-সিঙ্ক: {syncConfig.autoSync ? 'চালু' : 'বন্ধ'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Database URL & Proxy Settings Card */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <Database className="w-5 h-5 text-sky-600" />
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">ক্লাউড ডাটাবেজ সংযোগ (Google Firebase / Vercel KV)</h4>
+                      <p className="text-xs text-slate-500">ফ্যাক্টরির যে কোনো পিসি থেকে একই ডাটা এক্সেস করতে ক্লাউড ডাটাবেজ URL সেট করুন।</p>
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">
+                    100% Free & Automatic
+                  </span>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-800 mb-1 flex items-center justify-between">
+                      <span>Firebase Realtime Database URL (সুপার ফাস্ট ও ১০০% ফ্রি):</span>
+                      <span className="text-[11px] text-slate-400 font-normal">যেমন: https://walton-sop-xxx-rtdb.firebaseio.com</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={syncConfig.firebaseUrl}
+                        onChange={(e) => setSyncConfig((prev) => ({ ...prev, firebaseUrl: e.target.value }))}
+                        placeholder="https://your-project-default-rtdb.firebaseio.com"
+                        className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 font-mono focus:outline-none focus:border-sky-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleTestCloudConnection}
+                        disabled={isTestingSync}
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-300 text-white rounded-xl font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs whitespace-nowrap"
+                      >
+                        {isTestingSync ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5 text-sky-400" />}
+                        <span>টেস্ট কানেকশন</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      ভার্সেল সার্ভারলেস সিঙ্ক প্রক্সি এন্ডপয়েন্ট (Vercel Serverless Sync Proxy):
+                    </label>
+                    <input
+                      type="text"
+                      value={syncConfig.syncEndpoint}
+                      onChange={(e) => setSyncConfig((prev) => ({ ...prev, syncEndpoint: e.target.value }))}
+                      placeholder="/api/sync"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 font-mono focus:outline-none focus:border-sky-600"
+                    />
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      ডিফল্ট মান: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-700">/api/sync</code> (Vercel-এ হোস্ট থাকলে স্বয়ংক্রিয়ভাবে কাজ করে)।
+                    </p>
+                  </div>
+
+                  {syncTestResult && (
+                    <div className={`p-3 rounded-xl border flex items-start gap-2 text-xs animate-in fade-in ${
+                      syncTestResult.success
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                        : 'bg-rose-50 border-rose-300 text-rose-800'
+                    }`}>
+                      {syncTestResult.success ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <p className="font-bold">{syncTestResult.message}</p>
+                        {syncTestResult.backend && (
+                          <p className="text-[11px] opacity-80 mt-0.5">কানেক্টেড ব্যাকএন্ড: {syncTestResult.backend}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-2">
+                    <span className="text-[11px] text-slate-500">
+                      {syncConfig.lastSyncTime ? `সর্বশেষ সিঙ্ক: ${new Date(syncConfig.lastSyncTime).toLocaleTimeString('bn-BD')}` : 'এখনো সিঙ্ক করা হয়নি'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveCloudConfig(syncConfig)}
+                      className="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold shadow-xs transition cursor-pointer"
+                    >
+                      সেটিংস সংরক্ষণ করুন
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Manual One-Click Sync Operations */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <Upload className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">লোকাল ডাটা ক্লাউডে পুশ করুন</h4>
+                      <p className="text-[11px] text-slate-500">বর্তমান পিসির সমস্ত SOP ক্লাউডে আপলোড করুন।</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handlePushAllToCloud}
+                    disabled={isPushingCloud}
+                    className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
+                  >
+                    {isPushingCloud ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    <span>এখনই সব ক্লাউডে আপলোড করুন</span>
+                  </button>
+                </div>
+
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <Download className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">ক্লাউড থেকে সব ডাটা নামান</h4>
+                      <p className="text-[11px] text-slate-500">অন্যান্য পিসির সকল পেন্ডিং অনুমোদন ও SOP লোড করুন।</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handlePullAllFromCloud}
+                    disabled={isPullingCloud}
+                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
+                  >
+                    {isPullingCloud ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                    <span>ক্লাউড থেকে রিফ্রেশ ও সিঙ্ক করুন</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Step-by-Step Quick Guide Card */}
+              <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 text-xs space-y-3 text-slate-700">
+                <div className="flex items-center gap-2 font-bold text-slate-900">
+                  <Globe className="w-4 h-4 text-sky-600" />
+                  <span>কীভাবে ১ মিনিটে ফ্রি ক্লাউড ডাটাবেজ তৈরি করবেন? (Step-by-step Guide)</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px]">
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
+                    <span className="font-bold text-sky-600">১. Firebase তৈরি:</span>
+                    <p className="text-slate-600">
+                      <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="text-blue-600 underline">console.firebase.google.com</a> এ গিয়ে একটি ফ্রি প্রোজেক্ট খুলুন।
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
+                    <span className="font-bold text-sky-600">২. Realtime Database:</span>
+                    <p className="text-slate-600">
+                      "Build" &gt; "Realtime Database" &gt; "Create Database" এ ক্লিক করে Rules এ <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[10px]">read: true, write: true</code> দিয়ে দিন।
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
+                    <span className="font-bold text-sky-600">৩. URL পেস্ট করুন:</span>
+                    <p className="text-slate-600">
+                      ডাটাবেজের উপরের URL-টি কপি করে এখানে পেস্ট করে "সেটিংস সংরক্ষণ করুন" বাটনে ক্লিক করুন। সাথে সাথে সব PC সিঙ্ক শুরু হয়ে যাবে!
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: MASTER BACKUP & RESTORE */}
           {activeTab === 'backup' && (
             <div className="space-y-4 max-w-xl mx-auto py-6">
               <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
@@ -1045,52 +1323,6 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   <span>JSON ব্যাকআপ ফাইল সিলেক্ট করুন</span>
                   <input type="file" accept=".json" onChange={handleImportBackup} className="hidden" />
                 </label>
-              </div>
-
-              {/* Multi-PC Cloud Sync Configuration Card */}
-              <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                    <Laptop className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">মাল্টি-পিসি ক্লাউড সিঙ্ক কনফিগারেশন (Multi-PC Cloud Sync API)</h3>
-                    <p className="text-xs text-slate-500">
-                      ফ্যাক্টরির যে কোনো পিসি থেকে ইউজাররা তাদের সর্বশেষ খসড়া বা কাজ শুরু করতে এই এন্ডপয়েন্ট ব্যবহার করে।
-                    </p>
-                  </div>
-                </div>
-
-                {syncSavedMsg && (
-                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-2.5 rounded-xl font-medium">
-                    {syncSavedMsg}
-                  </div>
-                )}
-
-                <div className="space-y-2 text-xs">
-                  <label className="block font-semibold text-slate-700">
-                    ক্লাউড সিঙ্ক সার্ভার URL (API Endpoint):
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={syncUrl}
-                      onChange={(e) => setSyncUrl(e.target.value)}
-                      placeholder="/api/sync বা https://..."
-                      className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 font-mono focus:outline-none focus:border-blue-600"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSaveSyncUrl}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs"
-                    >
-                      সেভ করুন
-                    </button>
-                  </div>
-                  <p className="text-[11px] text-slate-400">
-                    ডিফল্ট মান: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-700">/api/sync</code> (ভার্সেল সার্ভারলেস সিঙ্ক)। কোম্পানি ইন্টারনাল সার্ভার থাকলে তার URL দিতে পারেন।
-                  </p>
-                </div>
               </div>
 
               {/* Reset Trial Data & Analytics Card */}
