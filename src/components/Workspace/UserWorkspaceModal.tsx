@@ -11,6 +11,7 @@ import {
   syncUserDraftWithCloud,
   pullAllSopsFromCloud,
 } from '../../services/storageService';
+import { downloadSOPAsPdf } from '../../services/pdfExporter';
 import {
   FileText,
   Trash2,
@@ -27,6 +28,7 @@ import {
   Download,
   Upload,
   RefreshCw,
+  FileDown,
 } from 'lucide-react';
 
 interface UserWorkspaceModalProps {
@@ -51,6 +53,7 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const transferInputRef = React.useRef<HTMLInputElement>(null);
 
   const fetchDocs = async () => {
@@ -81,18 +84,18 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
             <User className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-800">লগইন প্রয়োজন</h3>
+            <h3 className="text-base font-bold text-slate-800">Authentication Required</h3>
             <p className="text-xs text-slate-500 mt-1">
-              আপনার পার্সোনাল ওয়ার্কস্পেস এবং সংরক্ষিত SOP তালিকা দেখতে প্রথমে লগইন করুন।
+              Please sign in to access your personal workspace and manage your assigned SOP documents.
             </p>
           </div>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 rounded-xl border border-slate-300 text-slate-600 text-xs font-semibold"
+              className="flex-1 py-2 rounded-xl border border-slate-300 text-slate-600 text-xs font-semibold hover:bg-slate-100 transition cursor-pointer"
             >
-              বাতিল
+              Cancel
             </button>
             <button
               type="button"
@@ -100,9 +103,9 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
                 onClose();
                 onOpenLogin();
               }}
-              className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs"
+              className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs transition cursor-pointer"
             >
-              লগইন করুন
+              Sign In
             </button>
           </div>
         </div>
@@ -172,7 +175,7 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
   });
 
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`আপনি কি "${name || 'এই SOP'}" টি চিরতরে ডিলিট করতে চান?`)) {
+    if (confirm(`Are you sure you want to permanently delete "${name || 'this SOP'}"?`)) {
       await deleteSOP(id);
       await fetchDocs();
     }
@@ -187,12 +190,25 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
       updatedAt: undefined,
       header: {
         ...doc.header,
-        processName: `${doc.header.processName} (কপি)`,
+        processName: `${doc.header.processName} (Copy)`,
       },
     };
-    await saveSOP(copy, currentUser, 'SOP ডুপ্লিকেট করা হয়েছে');
+    await saveSOP(copy, currentUser, 'SOP duplicated as new draft');
     await fetchDocs();
-    alert('SOP সফলভাবে কপি করা হয়েছে!');
+    alert('SOP successfully duplicated as new draft!');
+  };
+
+  const handleDownloadPdf = async (sop: SOPDocument) => {
+    setDownloadingId(sop.id || 'temp');
+    try {
+      onSelectSop(sop);
+      await new Promise(r => setTimeout(r, 200));
+      await downloadSOPAsPdf('sop-paper', sop.header.processName, sop.header.referenceNo);
+    } catch (e: any) {
+      alert('PDF generation error: ' + (e.message || 'Unknown error'));
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const handleExportWorkspace = async () => {
@@ -207,7 +223,7 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
       a.click();
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      alert('এক্সপোর্ট ত্রুটি: ' + e.message);
+      alert('Export failed: ' + e.message);
     }
   };
 
@@ -230,7 +246,7 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
           alert(res.message);
         }
       } catch (err: any) {
-        alert('ফাইল লোড করতে ব্যর্থ হয়েছে: ' + err.message);
+        alert('Failed to read workspace backup file: ' + err.message);
       } finally {
         if (transferInputRef.current) transferInputRef.current.value = '';
       }
@@ -246,13 +262,13 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
       const syncedDoc = await syncUserDraftWithCloud(currentUser.id);
       if (syncedDoc) {
         onSelectSop(syncedDoc);
-        alert('ক্লাউড থেকে সফলভাবে আপনার সর্বশেষ কাজ ও সমস্ত পেন্ডিং অনুমোদন লোড করা হয়েছে!');
+        alert('Cloud synchronization successful! Latest drafts and approvals loaded.');
       } else {
-        alert('ক্লাউড সিঙ্ক সম্পন্ন হয়েছে (ডাটাবেজ আপ-টু-ডেট আছে)।');
+        alert('Cloud synchronization complete (workspace is up to date).');
       }
       await fetchDocs();
     } catch {
-      alert('ক্লাউড সিঙ্ক করতে সমস্যা হয়েছে। লোকাল ডাটা সুরক্ষিত রয়েছে।');
+      alert('Cloud sync failed. Local data remains safe.');
     } finally {
       setIsSyncing(false);
     }
@@ -261,15 +277,15 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
   const getStatusPill = (status?: string) => {
     switch (status) {
       case 'approved':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">অনুমোদিত</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">Approved</span>;
       case 'forwarded_to_approver':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">অনুমোদনে মুলতবি</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">Pending Approval</span>;
       case 'forwarded_to_checker':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">পর্যালোচনাধীন</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">Under Review</span>;
       case 'rejected':
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">সংশোধনে ফেরত</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800">Revision Requested</span>;
       default:
-        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">খসড়া</span>;
+        return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">Draft</span>;
     }
   };
 
@@ -305,7 +321,7 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
               className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>নতুন SOP তৈরি করুন</span>
+              <span>+ Create New SOP</span>
             </button>
             <button
               type="button"
@@ -324,7 +340,7 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
               <Laptop className="w-3.5 h-3.5" />
             </span>
             <span className="text-slate-200">
-              <strong>মাল্টি-পিসি সিঙ্ক:</strong> যেকোনো পিসি থেকে কাজ পুনরায় শুরু করতে ব্যাকআপ বা ক্লাউড সিঙ্ক ব্যবহার করুন।
+              <strong>Multi-Device Sync:</strong> Resume your drafts or review queues on any workstation via Cloud Sync or portable backup.
             </span>
           </div>
 
@@ -335,10 +351,10 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
               onClick={handleCloudSync}
               disabled={isSyncing}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition cursor-pointer text-[11px] shadow-xs disabled:opacity-50"
-              title="ক্লাউডের সাথে ড্রাফট সিঙ্ক করুন"
+              title="Synchronize drafts with cloud"
             >
               <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span>{isSyncing ? 'সিঙ্ক হচ্ছে...' : '🔄 ক্লাউড সিঙ্ক'}</span>
+              <span>{isSyncing ? 'Syncing...' : 'Cloud Sync'}</span>
             </button>
 
             {/* Export for another PC */}
@@ -346,10 +362,10 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
               type="button"
               onClick={handleExportWorkspace}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-semibold transition cursor-pointer text-[11px]"
-              title="এই পিসির কাজ অন্য পিসিতে নিতে ব্যাকআপ ফাইল ডাউনলোড করুন"
+              title="Export workspace backup file"
             >
               <Download className="w-3.5 h-3.5 text-sky-400" />
-              <span>পিসি ব্যাকআপ এক্সপোর্ট</span>
+              <span>Export Backup</span>
             </button>
 
             {/* Import from another PC */}
@@ -357,10 +373,10 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
               type="button"
               onClick={() => transferInputRef.current?.click()}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg font-semibold transition cursor-pointer text-[11px] shadow-xs"
-              title="অন্য পিসির ব্যাকআপ ফাইল থেকে কাজ লোড করুন"
+              title="Import workspace backup file from another PC"
             >
               <Upload className="w-3.5 h-3.5 text-emerald-200" />
-              <span>অন্য PC-এর কাজ লোড</span>
+              <span>Import Backup</span>
             </button>
             <input
               type="file"
@@ -385,7 +401,7 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
               }`}
             >
               <FolderArchive className="w-3.5 h-3.5" />
-              <span>আমার সংরক্ষিত SOP সমূহ ({mySops.length})</span>
+              <span>My SOP Drafts ({mySops.length})</span>
             </button>
 
             <button
@@ -398,7 +414,7 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-              <span>অনুমোদিত SOP সমূহ ({approvedSops.length})</span>
+              <span>Approved SOPs ({approvedSops.length})</span>
             </button>
 
             <button
@@ -413,8 +429,8 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
               <Inbox className="w-3.5 h-3.5" />
               <span>
                 {currentUser.role === 'prepared_by'
-                  ? `পর্যালোচনায় পাঠানো (${pendingQueue.length})`
-                  : `মুলতবি তালিকা (Queue: ${pendingQueue.length})`}
+                  ? `Submitted for Review (${pendingQueue.length})`
+                  : `Pending Queue (${pendingQueue.length})`}
               </span>
             </button>
           </div>
@@ -426,7 +442,7 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="প্রসেস বা মডেল দিয়ে খুঁজুন..."
+              placeholder="Search by process or model..."
               className="w-full bg-white border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500"
             />
           </div>
@@ -436,105 +452,124 @@ export const UserWorkspaceModal: React.FC<UserWorkspaceModalProps> = ({
         <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-slate-100/60">
           {loading ? (
             <div className="text-center py-12 text-slate-500 text-xs">
-              লোড হচ্ছে...
+              Loading workspace...
             </div>
           ) : filteredList.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-300 p-8 space-y-2">
               <FileText className="w-10 h-10 text-slate-300 mx-auto" />
-              <h4 className="text-sm font-bold text-slate-700">কোনো SOP পাওয়া যায়নি</h4>
+              <h4 className="text-sm font-bold text-slate-700">No SOPs Found</h4>
               <p className="text-xs text-slate-400">
                 {activeTab === 'my_sops'
-                  ? 'আপনার কোনো সংরক্ষিত SOP নেই। উপরে "+ নতুন SOP তৈরি করুন" বাটনে ক্লিক করে শুরু করুন।'
-                  : 'বর্তমানে আপনার পর্যালোচনার অপেক্ষায় কোনো কাজ নেই।'}
+                  ? 'No drafts found in your workspace. Click "+ Create New SOP" above to start.'
+                  : 'No pending standard operating procedures awaiting your review.'}
               </p>
             </div>
           ) : (
-            filteredList.map((doc) => (
-              <div
-                key={doc.id}
-                className="bg-white border border-slate-200 hover:border-blue-300 rounded-xl p-3.5 shadow-xs hover:shadow-md transition flex items-center justify-between gap-4"
-              >
-                {/* Left Info */}
-                <div className="flex items-start gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-200">
-                    <FileText className="w-5 h-5" />
+            filteredList.map((doc) => {
+              const isApproved = doc.status === 'approved';
+
+              return (
+                <div
+                  key={doc.id}
+                  className="bg-white border border-slate-200 hover:border-blue-300 rounded-xl p-3.5 shadow-xs hover:shadow-md transition flex items-center justify-between gap-4"
+                >
+                  {/* Left Info */}
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-200">
+                      <FileText className="w-5 h-5" />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <h4 className="font-bold text-slate-900 text-xs truncate">
+                          {doc.header.processName || 'Untitled Process'}
+                        </h4>
+                        {getStatusPill(doc.status)}
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+                        <span>Model: <strong className="text-slate-700">{doc.header.model || '-'}</strong></span>
+                        <span>•</span>
+                        <span>Author: <strong className="text-slate-700">{doc.authorName || doc.header.preparedBy.name || '-'}</strong></span>
+                        <span>•</span>
+                        {doc.status === 'forwarded_to_checker' && (
+                          <>
+                            <span className="text-blue-600 font-medium">
+                              Pending Reviewer: <strong>{doc.checkedByName || 'Sazzad (50463)'}</strong>
+                            </span>
+                            <span>•</span>
+                          </>
+                        )}
+                        {doc.status === 'forwarded_to_approver' && (
+                          <>
+                            <span className="text-purple-600 font-medium">
+                              Pending Approver: <strong>{doc.approvedByName || 'Kamrul (44819)'}</strong>
+                            </span>
+                            <span>•</span>
+                          </>
+                        )}
+                        <span>Date: {doc.updatedAt ? new Date(doc.updatedAt).toLocaleDateString() : '-'}</span>
+                      </div>
+
+                      {doc.rejectionReason && (
+                        <div className="mt-1 text-[11px] text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 inline-block">
+                          Revision comments: {doc.rejectionReason}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <h4 className="font-bold text-slate-900 text-xs truncate">
-                        {doc.header.processName || 'Untitled Process'}
-                      </h4>
-                      {getStatusPill(doc.status)}
-                    </div>
+                  {/* Actions: Strict Rule 4: If approved, ONLY PDF download option allowed */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isApproved ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadPdf(doc)}
+                        disabled={downloadingId === doc.id}
+                        className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50 active:scale-95"
+                        title="Download Official Approved PDF"
+                      >
+                        <FileDown className="w-3.5 h-3.5" />
+                        <span>{downloadingId === doc.id ? 'Generating...' : 'Download PDF'}</span>
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onSelectSop(doc);
+                            onClose();
+                          }}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+                          title="Open SOP in Editor"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Open</span>
+                        </button>
 
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
-                      <span>মডেল: <strong className="text-slate-700">{doc.header.model || '-'}</strong></span>
-                      <span>•</span>
-                      <span>প্রস্তুতকারী: <strong className="text-slate-700">{doc.authorName || doc.header.preparedBy.name || '-'}</strong></span>
-                      <span>•</span>
-                      {doc.status === 'forwarded_to_checker' && (
-                        <>
-                          <span className="text-blue-600 font-medium">
-                            পেন্ডিং পর্যালোচক: <strong>{doc.checkedByName || 'Sazzad (50463)'}</strong>
-                          </span>
-                          <span>•</span>
-                        </>
-                      )}
-                      {doc.status === 'forwarded_to_approver' && (
-                        <>
-                          <span className="text-purple-600 font-medium">
-                            পেন্ডিং অনুমোদনকারী: <strong>{doc.approvedByName || 'Kamrul (44819)'}</strong>
-                          </span>
-                          <span>•</span>
-                        </>
-                      )}
-                      <span>তারিখ: {doc.updatedAt ? new Date(doc.updatedAt).toLocaleDateString('bn-BD') : '-'}</span>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDuplicate(doc)}
+                          className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                          title="Duplicate as New Draft"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
 
-                    {doc.rejectionReason && (
-                      <div className="mt-1 text-[11px] text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 inline-block">
-                        সংশোধন নোট: {doc.rejectionReason}
-                      </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(doc.id!, doc.header.processName)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                          title="Delete SOP"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onSelectSop(doc);
-                      onClose();
-                    }}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
-                    title="এই SOP এডিটরে লোড করুন"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>ওপেন</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDuplicate(doc)}
-                    className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                    title="ডুপ্লিকেট / কপি তৈরি করুন"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(doc.id!, doc.header.processName)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                    title="আর্কাইভ থেকে ডিলিট করুন"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

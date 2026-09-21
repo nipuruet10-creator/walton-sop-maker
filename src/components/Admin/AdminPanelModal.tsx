@@ -107,7 +107,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
   const handleSaveCloudConfig = (updated: Partial<CloudSyncConfig>) => {
     const res = saveCloudSyncConfig(updated);
     setSyncConfig(res);
-    setSuccessMsg('ক্লাউড সিঙ্ক সেটিংস সফলভাবে সংরক্ষিত হয়েছে!');
+    setSuccessMsg('Cloud sync settings successfully saved!');
     setTimeout(() => setSuccessMsg(null), 3500);
   };
 
@@ -119,7 +119,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
       setSyncTestResult(res);
       setSyncConfig(getCloudSyncConfig());
     } catch (e: any) {
-      setSyncTestResult({ success: false, message: 'কানেকশন এরর: ' + e.message });
+      setSyncTestResult({ success: false, message: 'Connection error: ' + e.message });
     } finally {
       setIsTestingSync(false);
     }
@@ -129,11 +129,11 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
     setIsPushingCloud(true);
     try {
       const res = await pushAllLocalSopsToCloud();
-      setSuccessMsg(`সফল! ${res.count} টি লোকাল SOP ক্লাউডে আপলোড করা হয়েছে।`);
+      setSuccessMsg(`Success! ${res.count}  local SOPs uploaded to cloud.`);
       setTimeout(() => setSuccessMsg(null), 3500);
       setSyncConfig(getCloudSyncConfig());
     } catch (e: any) {
-      alert('ক্লাউডে আপলোড ব্যর্থ: ' + e.message);
+      alert('Cloud upload failed: ' + e.message);
     } finally {
       setIsPushingCloud(false);
     }
@@ -143,11 +143,11 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
     setIsPullingCloud(true);
     try {
       const sops = await pullAllSopsFromCloud();
-      setSuccessMsg(`সফল! ক্লাউড থেকে ${sops.length} টি SOP ও পেন্ডিং অনুমোদন সিঙ্ক হয়েছে।`);
+      setSuccessMsg(`Success! ${sops.length}  SOPs and pending approvals synchronized from cloud.`);
       setTimeout(() => setSuccessMsg(null), 3500);
       setSyncConfig(getCloudSyncConfig());
     } catch (e: any) {
-      alert('ক্লাউড থেকে সিঙ্ক ব্যর্থ: ' + e.message);
+      alert('Cloud sync failed: ' + e.message);
     } finally {
       setIsPullingCloud(false);
     }
@@ -181,9 +181,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
             <ShieldAlert className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="font-bold text-slate-900 text-sm">অ্যাক্সেস সংরক্ষিত (Access Denied)</h3>
+            <h3 className="font-bold text-slate-900 text-sm">Access Denied</h3>
             <p className="text-xs text-slate-500 mt-1">
-              এই সেটিং ও অনুমোদন প্যানেলে প্রবেশের অধিকার শুধুমাত্র অ্যাডমিন (ID: Sazzad / 50463, Pass: ACprocess@2026)-এর রয়েছে।
+              Access to the administrative control panel is restricted to System Administrators (ID: Sazzad / 50463).
             </p>
           </div>
           <button
@@ -191,7 +191,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
             onClick={onClose}
             className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer"
           >
-            প্যানেল বন্ধ করুন
+            Close Panel
           </button>
         </div>
       </div>,
@@ -229,13 +229,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
         }
       } else {
         if (!aiConfig.geminiKey.trim()) {
-          setAiTestResult({ success: false, message: 'Gemini API Key খালি রাখা যাবে না।' });
+          setAiTestResult({ success: false, message: 'Gemini API Key cannot be empty.' });
         } else {
-          setAiTestResult({ success: true, message: '✅ Gemini API Key সংরক্ষিত হয়েছে।' });
+          setAiTestResult({ success: true, message: '✅ Gemini API Key successfully saved.' });
         }
       }
     } catch (e: any) {
-      setAiTestResult({ success: false, message: 'টেস্ট ব্যর্থ: ' + e.message });
+      setAiTestResult({ success: false, message: 'Test failed: ' + e.message });
     } finally {
       setIsTestingAi(false);
     }
@@ -244,7 +244,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
   const handleSaveAiConfig = (e: React.FormEvent) => {
     e.preventDefault();
     saveGlobalAiConfig(aiConfig);
-    showNotification('সেন্ট্রাল AI ইঞ্জিন কনফিগারেশন সফলভাবে সেভ হয়েছে! সকল ইঞ্জিনিয়ার এখন থেকে এই API ব্যবহার করতে পারবেন।');
+    showNotification('Central AI engine configuration successfully saved! All plant engineers can now use this AI.');
   };
 
   // Add User / Approver Handler
@@ -254,12 +254,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
     const cleanName = newUserName.trim();
 
     if (!cleanId || !cleanName) {
-      alert('অনুগ্রহ করে ইউজার আইডি এবং পূর্ণ নাম লিখুন।');
+      alert('Please provide both User ID and Full Name.');
       return;
     }
 
     if (users.some((u) => u.id.toLowerCase() === cleanId.toLowerCase() || u.username.toLowerCase() === cleanId.toLowerCase())) {
-      alert(`আইডি "${cleanId}" ইতিমধ্যে বিদ্যমান! অনুগ্রহ করে অন্য আইডি ব্যবহার করুন।`);
+      alert(`ID "${cleanId}" already exists! Please choose a different ID.`);
       return;
     }
 
@@ -287,10 +287,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
     const ok = await addUser(newUser);
     if (ok) {
-      showNotification(`কর্মকর্তা "${cleanName}" (${cleanId}) সফলভাবে যুক্ত করা হয়েছে!`);
+      showNotification(`User "${cleanName}" (${cleanId}) successfully added!`);
       await fetchUsers();
     } else {
-      alert('ইউজার যুক্ত করতে সমস্যা হয়েছে।');
+      alert('Failed to add user.');
       await fetchUsers();
     }
   };
@@ -325,10 +325,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
     const ok = await updateUserProfile(updatedUser);
     if (ok) {
-      showNotification(`"${updatedUser.name}" এর তথ্য ও সিকোয়েন্স সফলভাবে আপডেট করা হয়েছে!`);
+      showNotification(`"${updatedUser.name}" details & routing successfully updated!`);
       await fetchUsers();
     } else {
-      alert('তথ্য আপডেট ব্যর্থ হয়েছে।');
+      alert('Failed to update user details.');
       await fetchUsers();
     }
   };
@@ -336,12 +336,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
   // Delete User / Approver Handler
   const handleDeleteUser = async (user: UserProfile) => {
     if (user.id === 'Admin_Sazzad' || (user.id === 'Sazzad' && user.role === 'admin')) {
-      alert('সিস্টেম সুপার অ্যাডমিন আইডি মুছে ফেলা যাবে না!');
+      alert('The system Super Admin account cannot be deleted!');
       return;
     }
 
     const confirmed = window.confirm(
-      `আপনি কি নিশ্চিতভাবে "${user.name}" (ID: ${user.id}, Role: ${user.role}) কে মুছে ফেলতে চান?`
+      `Are you sure you want to permanently delete "${user.name}" (ID: ${user.id}, Role: ${user.role})?`
     );
     if (!confirmed) return;
 
@@ -350,10 +350,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
     const ok = await deleteUser(user.id);
     if (ok) {
-      showNotification(`ইউজার "${user.name}" কে সফলভাবে মুছে ফেলা হয়েছে।`);
+      showNotification(`User "${user.name}" successfully deleted.`);
       await fetchUsers();
     } else {
-      alert('ইউজার মুছতে ব্যর্থ হয়েছে।');
+      alert('Failed to delete user.');
       await fetchUsers();
     }
   };
@@ -361,17 +361,17 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
   // Reset Password Handler
   const handleResetPassword = async (userId: string) => {
     if (!newPassword.trim()) {
-      alert('অনুগ্রহ করে নতুন পাসওয়ার্ড লিখুন।');
+      alert('Please enter a new password.');
       return;
     }
     const ok = await resetUserPassword(userId, newPassword.trim());
     if (ok) {
-      showNotification(`ইউজার ${userId} এর পাসওয়ার্ড সফলভাবে রিসেট করা হয়েছে!`);
+      showNotification(`User ${userId} password successfully reset!`);
       setNewPassword('');
       setSelectedUserForReset(null);
       await fetchUsers();
     } else {
-      alert('পাসওয়ার্ড রিসেট ব্যর্থ হয়েছে।');
+      alert('Password reset failed.');
     }
   };
 
@@ -400,10 +400,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
       const json = event.target?.result as string;
       const res = await importDatabaseBackup(json);
       if (res.success) {
-        alert(`ব্যাকআপ সফলভাবে রিস্টোর হয়েছে! ${res.sopCount} টি SOP উদ্ধার করা হয়েছে।`);
+        alert(`Backup successfully restored! ${res.sopCount} SOPs recovered.`);
         await fetchUsers();
       } else {
-        alert('ব্যাকআপ ফাইলটি সঠিক নয়।');
+        alert('Invalid backup file format.');
       }
     };
     reader.readAsText(file);
@@ -411,12 +411,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
   const handleClearTrialData = async () => {
     const ok = window.confirm(
-      'সতর্কতা: আপনি কি নিশ্চিত যে পূর্ববর্তী সকল ট্রায়াল SOP ডাটা ও টেস্ট রেকর্ড মুছে ফেলতে চান? এটি সমস্ত ট্রায়াল রেকর্ড ক্লিয়ার করে নতুন ফ্রেশ ডাটাবেজ প্রস্তুত করবে।'
+      'WARNING: Are you sure you want to delete all trial SOP data and analytics history? This will clear all test records and initialize a fresh database.'
     );
     if (!ok) return;
 
     const res = await clearTrialData();
-    showNotification(`ট্রায়াল ডাটা সফলভাবে মুছে ফেলা হয়েছে (${res.sopsDeleted} টি ট্রায়াল রেকর্ড ক্লিয়ার করা হয়েছে)!`);
+    showNotification(`Trial data cleared successfully (${res.sopsDeleted} trial records cleared)!`);
   };
 
   // Filtered Users List
@@ -453,7 +453,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                অনুমোদন রুট ও সিকোয়েন্স, গ্লোবাল AI ইঞ্জিন, ইউজার কন্ট্রোল ও ব্যাকআপ
+                Approval Routing Pipeline, Global AI Engine, User Control & Master Backup
               </p>
             </div>
           </div>
@@ -480,7 +480,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               }`}
             >
               <Workflow className="w-3.5 h-3.5" />
-              <span>অনুমোদন রুট ও সিকোয়েন্স</span>
+              <span>Approval Route Pipeline</span>
             </button>
 
             <button
@@ -493,7 +493,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               }`}
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>সেন্ট্রাল AI ইঞ্জিন সেটিংস</span>
+              <span>Central AI Engine Settings</span>
             </button>
 
             <button
@@ -506,7 +506,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               }`}
             >
               <Users className="w-3.5 h-3.5" />
-              <span>ইউজার ও পাসওয়ার্ড ({users.length})</span>
+              <span>Users & Passwords ({users.length})</span>
             </button>
 
             <button
@@ -519,7 +519,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               }`}
             >
               <Cloud className="w-3.5 h-3.5 text-sky-400" />
-              <span>ক্লাউড সিঙ্ক (Multi-PC)</span>
+              <span>Cloud Sync (Multi-PC)</span>
             </button>
 
             <button
@@ -532,7 +532,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               }`}
             >
               <Download className="w-3.5 h-3.5" />
-              <span>মাস্টার ব্যাকআপ ও রিস্টোর</span>
+              <span>Master Backup & Restore</span>
             </button>
           </div>
 
@@ -555,10 +555,10 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   <div>
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
                       <Workflow className="w-4 h-4 text-rose-700" />
-                      <span>অনুমোদন সিকোয়েন্স রুট পাইপলাইন (3-Step Approval Pipeline)</span>
+                      <span>3-Step Approval Sequence Pipeline</span>
                     </h3>
                     <p className="text-[11px] text-slate-500">
-                      প্রত্যেকটি ধাপে নির্দিষ্ট কর্মকর্তাদের মাধ্যমে এসওপি পর্যালোচনা ও ছাড়পত্র প্রদান করা হয়
+                      SOP review, verification, and formal clearance are governed across each sequence stage
                     </p>
                   </div>
                   <button
@@ -567,7 +567,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     className="flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
-                    <span>নতুন কর্মকর্তা যুক্ত করুন</span>
+                    <span>+ Add New Official</span>
                   </button>
                 </div>
 
@@ -576,15 +576,15 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   <div className="bg-slate-50 border border-emerald-200 rounded-xl p-3.5 relative">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                        ধাপ ১: প্রস্তুতকারী (Process concern)
+                        Step 1: Prepared By (Process Concern)
                       </span>
                       <span className="text-xs font-mono font-bold text-slate-500">
-                        {preparedByUsers.length} জন
+                        {preparedByUsers.length} Users
                       </span>
                     </div>
-                    <h4 className="text-xs font-bold text-slate-900 mt-2">প্রসেস ইঞ্জিনিয়ার ও ক্রিয়েটর</h4>
+                    <h4 className="text-xs font-bold text-slate-900 mt-2">Process Engineers & Authors</h4>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      বাংলিশ থেকে শুদ্ধ বাংলা এসওপি ড্রাফট, ছবি চিহ্নিতকরণ ও সাইন দিয়ে লেভেল ২-এ ফরোয়ার্ড করেন।
+                      Drafts SOPs with Banglish conversion, photo annotation, and submits for section review.
                     </p>
                     <div className="mt-2.5 flex flex-wrap gap-1">
                       {preparedByUsers.map((u) => (
@@ -602,15 +602,15 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   <div className="bg-slate-50 border border-blue-200 rounded-xl p-3.5 relative">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
-                        ধাপ ২: পর্যালোচক (Section In charge)
+                        Step 2: Reviewed By (Section In-Charge)
                       </span>
                       <span className="text-xs font-mono font-bold text-slate-500">
-                        {checkedByUsers.length} জন
+                        {checkedByUsers.length} Users
                       </span>
                     </div>
-                    <h4 className="text-xs font-bold text-slate-900 mt-2">ইন-চার্জ ও কোয়ালিটি প্রধান</h4>
+                    <h4 className="text-xs font-bold text-slate-900 mt-2">Section In-Charges & Reviewers</h4>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      প্রসেস ও সেফটি নিরীক্ষা, নিজস্ব ডিজিটাল সাইন যুক্ত করে লেভেল ৩-এ ফরোয়ার্ড বা রিজেক্ট করেন।
+                      Verifies process & safety accuracy, applies digital review signature, and forwards for approval or revision.
                     </p>
                     <div className="mt-2.5 flex flex-wrap gap-1">
                       {checkedByUsers.map((u) => (
@@ -628,15 +628,15 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   <div className="bg-slate-50 border border-purple-200 rounded-xl p-3.5 relative">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
-                        ধাপ ৩: অনুমোদনকারী (Process HOD)
+                        Step 3: Approved By (Process HOD)
                       </span>
                       <span className="text-xs font-mono font-bold text-slate-500">
-                        {approvedByUsers.length} জন
+                        {approvedByUsers.length} Users
                       </span>
                     </div>
-                    <h4 className="text-xs font-bold text-slate-900 mt-2">প্ল্যান্ট ম্যানেজার / বিভাগীয় প্রধান</h4>
+                    <h4 className="text-xs font-bold text-slate-900 mt-2">Plant Managers & Process HOD</h4>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      চূড়ান্ত যাচাই, সিগনেচার সীল এবং ফ্যাক্টরির কনসার্ন সেকশনে আর্কাইভের জন্য প্রকাশ করেন।
+                      Conducts final verification, applies signature seal, and authorizes publication to the official factory archive.
                     </p>
                     <div className="mt-2.5 flex flex-wrap gap-1">
                       {approvedByUsers.map((u) => (
@@ -656,7 +656,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-slate-700">সিকোয়েন্স ফিল্টার:</span>
+                    <span className="text-xs font-bold text-slate-700">Route Filter:</span>
                     <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs">
                       <button
                         type="button"
@@ -665,7 +665,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                           levelFilter === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        সকল ({users.length})
+                        All ({users.length})
                       </button>
                       <button
                         type="button"
@@ -674,7 +674,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                           levelFilter === 'prepared_by' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        ১. Process concern ({preparedByUsers.length})
+                        1. Process Concern ({preparedByUsers.length})
                       </button>
                       <button
                         type="button"
@@ -683,7 +683,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                           levelFilter === 'checked_by' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        ২. Section In charge ({checkedByUsers.length})
+                        2. Section In-Charge ({checkedByUsers.length})
                       </button>
                       <button
                         type="button"
@@ -692,7 +692,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                           levelFilter === 'approved_by' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                         }`}
                       >
-                        ৩. Process HOD ({approvedByUsers.length})
+                        3. Process HOD ({approvedByUsers.length})
                       </button>
                     </div>
                   </div>
@@ -704,7 +704,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="নাম, পদবী, আইডি দিয়ে খুঁজুন..."
+                      placeholder="Search by name, designation, or ID..."
                       className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-rose-600"
                     />
                   </div>
@@ -748,12 +748,12 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                               }`}
                             >
                               {u.role === 'admin'
-                                ? 'অ্যাডমিন'
+                                ? 'Admin'
                                 : u.role === 'approved_by'
-                                ? '৩. Process HOD'
+                                ? '3. Process HOD'
                                 : u.role === 'checked_by'
-                                ? '২. Section In charge'
-                                : '১. Process concern'}
+                                ? '2. Section In-Charge'
+                                : '1. Process Concern'}
                             </span>
                           </div>
                         </div>
@@ -761,7 +761,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                         {/* Card Actions: Edit & Remove */}
                         <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-100 text-[11px]">
                           <span className="text-[10px] text-slate-400 font-mono">
-                            পাসওয়ার্ড: ••••••••
+                            Password: ••••••••
                           </span>
 
                           <div className="flex items-center gap-1.5">
@@ -769,7 +769,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                               type="button"
                               onClick={() => handleOpenEdit(u)}
                               className="p-1 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
-                              title="তথ্য ও সিকোয়েন্স এডিট করুন"
+                              title="Edit User Details & Route"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
@@ -779,7 +779,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                                 type="button"
                                 onClick={() => handleDeleteUser(u)}
                                 className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                                title="অনুমোদনকারী মুছে ফেলুন"
+                                title="Delete User"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -804,9 +804,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                       <Sparkles className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-slate-900">সেন্ট্রাল AI ইঞ্জিন কনফিগারেশন</h3>
+                      <h3 className="text-sm font-bold text-slate-900">Central AI Engine Configuration</h3>
                       <p className="text-xs text-slate-500">
-                        এখানে একবার API Key সেভ করলে সকল ইউজার এর মাধ্যমে বাংলিশ থেকে বাংলা SOP তৈরি করতে পারবেন।
+                        Once the API key is saved here, all factory engineers can generate standard Bengali SOPs from Banglish notes.
                       </p>
                     </div>
                   </div>
@@ -815,7 +815,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 flex items-start gap-2">
                   <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <strong>অ্যাডমিন নির্দেশিকা:</strong> এই প্যানেলে আপনি যে API Key এবং মডেল সিলেক্ট করবেন, তা সমগ্র সিস্টেমের জন্য প্রযোজ্য হবে। কোনো ব্যবহারকারীকে আলাদা করে তাদের ব্যক্তিগত API Key দিতে হবে না। রিমুভ না করা পর্যন্ত এটি সক্রিয় থাকবে।
+                    <strong>Admin Notice:</strong> The API key and model configured here apply system-wide across all workstations. Engineers do not need to provide personal keys. Configuration remains active until modified.
                   </div>
                 </div>
 
@@ -823,7 +823,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   {/* Provider Switcher */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                      AI প্রোভাইডার সিলেক্ট করুন
+                      Select AI Provider
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <button
@@ -836,7 +836,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                         }`}
                       >
                         <Cpu className="w-4 h-4 text-blue-600" />
-                        <span>OpenRouter AI (ফ্রি ও পেইড মডেল)</span>
+                        <span>OpenRouter AI (Free & Advanced Models)</span>
                       </button>
 
                       <button
@@ -866,7 +866,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                             rel="noreferrer"
                             className="text-[11px] text-blue-600 hover:underline flex items-center gap-1"
                           >
-                            <span>ফ্রি Key তৈরি করুন</span>
+                            <span>Get Free Key</span>
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         </div>
@@ -894,7 +894,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                               disabled={isTestingAi || !aiConfig.openRouterKey}
                               className="px-2 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold rounded-lg transition cursor-pointer disabled:opacity-50"
                             >
-                              {isTestingAi ? 'টেস্ট হচ্ছে...' : 'টেস্ট'}
+                              {isTestingAi ? 'Testing...' : 'Test Key'}
                             </button>
                           </div>
                         </div>
@@ -903,7 +903,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                       {/* Model Selector */}
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <label className="text-xs font-bold text-slate-700">ডিফল্ট AI মডেল সিলেক্ট করুন</label>
+                          <label className="text-xs font-bold text-slate-700">Select Default AI Model</label>
                           <button
                             type="button"
                             onClick={() => handleFetchModels()}
@@ -911,7 +911,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                             className="text-[11px] text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
                           >
                             <RefreshCw className={`w-3 h-3 ${isFetchingModels ? 'animate-spin' : ''}`} />
-                            <span>মডেল রিফ্রেশ</span>
+                            <span>Refresh Models</span>
                           </button>
                         </div>
                         <select
@@ -941,7 +941,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                             rel="noreferrer"
                             className="text-[11px] text-blue-600 hover:underline flex items-center gap-1"
                           >
-                            <span>ফ্রি Gemini Key তৈরি করুন</span>
+                            <span>Get Free Gemini Key</span>
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         </div>
@@ -989,7 +989,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                       className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-2 cursor-pointer"
                     >
                       <Check className="w-4 h-4" />
-                      <span>গ্লোবাল AI কনফিগারেশন সেভ করুন</span>
+                      <span>Save Global AI Configuration</span>
                     </button>
                   </div>
                 </form>
@@ -1002,9 +1002,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
             <div className="space-y-4">
               <div className="bg-white rounded-xl p-3.5 border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
                 <span>
-                  মোট সক্রিয় ইউজার: <strong>{users.length} জন</strong> (এখানে যেকোনো ইউজারের পাসওয়ার্ড পরিবর্তন করতে পারেন)
+                  Total Active Users: <strong>{users.length} Users</strong> (Manage credentials and reset passwords here)
                 </span>
-                <span className="text-slate-400">ডিফল্ট পাসওয়ার্ড: Process@2026</span>
+                <span className="text-slate-400">Default Password: Process@2026</span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1038,18 +1038,18 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                         }`}
                       >
                         {u.role === 'admin'
-                          ? 'অ্যাডমিন'
+                          ? 'Admin'
                           : u.role === 'approved_by'
-                          ? '৩. Process HOD'
+                          ? '3. Process HOD'
                           : u.role === 'checked_by'
-                          ? '২. Section In charge'
-                          : '১. Process concern'}
+                          ? '2. Section In-Charge'
+                          : '1. Process Concern'}
                       </span>
                     </div>
 
                     <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
                       <span className="text-slate-500 font-mono text-[10px]">
-                        পাসওয়ার্ড: ••••••••••••
+                        Password: ••••••••••••
                       </span>
 
                       <button
@@ -1058,7 +1058,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                         className="flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold transition cursor-pointer"
                       >
                         <KeyRound className="w-3 h-3 text-blue-600" />
-                        <span>পাসওয়ার্ড রিসেট</span>
+                        <span>Reset Password</span>
                       </button>
                     </div>
                   </div>
@@ -1080,18 +1080,18 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold tracking-tight">মাল্টি-পিসি ক্লাউড রেপ্লিকেশন ইঞ্জিন</h3>
+                      <h3 className="text-sm font-bold tracking-tight">Multi-PC Cloud Replication Engine</h3>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border ${
                         syncConfig.firebaseUrl
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                           : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
                       }`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${syncConfig.firebaseUrl ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-                        {syncConfig.firebaseUrl ? 'ক্লাউড সিঙ্ক সক্রিয় (Online)' : 'লোকাল মোড (Standalone)'}
+                        {syncConfig.firebaseUrl ? 'Cloud Sync Active (Online)' : 'Local Mode (Standalone)'}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      বিপ্লব (PC-1), সাজ্জাদ (PC-2), ও কামরুল (PC-3) সহ ফ্যাক্টরির যে কোনো কম্পিউটার থেকে রিয়েল-টাইম অটোমেটিক সিঙ্ক।
+                      Real-time cross-PC synchronization between Author (Biplob), Reviewer (Sazzad), and Approver (Kamrul Hasan).
                     </p>
                   </div>
                 </div>
@@ -1107,7 +1107,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     }`}
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${syncConfig.autoSync ? 'animate-spin' : ''}`} />
-                    <span>অটো-সিঙ্ক: {syncConfig.autoSync ? 'চালু' : 'বন্ধ'}</span>
+                    <span>Auto-Sync: {syncConfig.autoSync ? 'Enabled' : 'Disabled'}</span>
                   </button>
                 </div>
               </div>
@@ -1118,8 +1118,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   <div className="flex items-center gap-2.5">
                     <Database className="w-5 h-5 text-sky-600" />
                     <div>
-                      <h4 className="text-sm font-bold text-slate-900">ক্লাউড ডাটাবেজ সংযোগ (Google Firebase / Vercel KV)</h4>
-                      <p className="text-xs text-slate-500">ফ্যাক্টরির যে কোনো পিসি থেকে একই ডাটা এক্সেস করতে ক্লাউড ডাটাবেজ URL সেট করুন।</p>
+                      <h4 className="text-sm font-bold text-slate-900">Cloud Database Connection (Google Firebase / Vercel KV)</h4>
+                      <p className="text-xs text-slate-500">Configure the cloud database URL to sync SOPs and approvals across all factory workstations.</p>
                     </div>
                   </div>
                   <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">
@@ -1130,8 +1130,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                 <div className="space-y-3 text-xs">
                   <div>
                     <label className="block font-semibold text-slate-800 mb-1 flex items-center justify-between">
-                      <span>Firebase Realtime Database URL (সুপার ফাস্ট ও ১০০% ফ্রি):</span>
-                      <span className="text-[11px] text-slate-400 font-normal">যেমন: https://walton-sop-xxx-rtdb.firebaseio.com</span>
+                      <span>Firebase Realtime Database URL (Ultra-fast & 100% Free):</span>
+                      <span className="text-[11px] text-slate-400 font-normal">e.g. https://walton-sop-xxx-rtdb.firebaseio.com</span>
                     </label>
                     <div className="flex gap-2">
                       <input
@@ -1148,14 +1148,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                         className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-300 text-white rounded-xl font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs whitespace-nowrap"
                       >
                         {isTestingSync ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5 text-sky-400" />}
-                        <span>টেস্ট কানেকশন</span>
+                        <span>Test Connection</span>
                       </button>
                     </div>
                   </div>
 
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">
-                      ভার্সেল সার্ভারলেস সিঙ্ক প্রক্সি এন্ডপয়েন্ট (Vercel Serverless Sync Proxy):
+                      Vercel Serverless Sync Proxy Endpoint:
                     </label>
                     <input
                       type="text"
@@ -1165,7 +1165,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 font-mono focus:outline-none focus:border-sky-600"
                     />
                     <p className="text-[11px] text-slate-400 mt-1">
-                      ডিফল্ট মান: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-700">/api/sync</code> (Vercel-এ হোস্ট থাকলে স্বয়ংক্রিয়ভাবে কাজ করে)।
+                      Default value: <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-700">/api/sync</code> (Automatic when hosted on Vercel).
                     </p>
                   </div>
 
@@ -1183,7 +1183,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                       <div>
                         <p className="font-bold">{syncTestResult.message}</p>
                         {syncTestResult.backend && (
-                          <p className="text-[11px] opacity-80 mt-0.5">কানেক্টেড ব্যাকএন্ড: {syncTestResult.backend}</p>
+                          <p className="text-[11px] opacity-80 mt-0.5">Connected Backend: {syncTestResult.backend}</p>
                         )}
                       </div>
                     </div>
@@ -1191,14 +1191,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
                   <div className="flex items-center justify-between pt-2">
                     <span className="text-[11px] text-slate-500">
-                      {syncConfig.lastSyncTime ? `সর্বশেষ সিঙ্ক: ${new Date(syncConfig.lastSyncTime).toLocaleTimeString('bn-BD')}` : 'এখনো সিঙ্ক করা হয়নি'}
+                      {syncConfig.lastSyncTime ? `Last Sync: ${new Date(syncConfig.lastSyncTime).toLocaleTimeString()}` : 'Not synchronized yet'}
                     </span>
                     <button
                       type="button"
                       onClick={() => handleSaveCloudConfig(syncConfig)}
                       className="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold shadow-xs transition cursor-pointer"
                     >
-                      সেটিংস সংরক্ষণ করুন
+                      Save Settings
                     </button>
                   </div>
                 </div>
@@ -1212,8 +1212,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                       <Upload className="w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-slate-900">লোকাল ডাটা ক্লাউডে পুশ করুন</h4>
-                      <p className="text-[11px] text-slate-500">বর্তমান পিসির সমস্ত SOP ক্লাউডে আপলোড করুন।</p>
+                      <h4 className="text-xs font-bold text-slate-900">Push Local Data to Cloud</h4>
+                      <p className="text-[11px] text-slate-500">Upload all SOPs from this PC to central cloud storage.</p>
                     </div>
                   </div>
                   <button
@@ -1223,7 +1223,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
                   >
                     {isPushingCloud ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                    <span>এখনই সব ক্লাউডে আপলোড করুন</span>
+                    <span>Push All to Cloud Now</span>
                   </button>
                 </div>
 
@@ -1233,8 +1233,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                       <Download className="w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-slate-900">ক্লাউড থেকে সব ডাটা নামান</h4>
-                      <p className="text-[11px] text-slate-500">অন্যান্য পিসির সকল পেন্ডিং অনুমোদন ও SOP লোড করুন।</p>
+                      <h4 className="text-xs font-bold text-slate-900">Pull All Data from Cloud</h4>
+                      <p className="text-[11px] text-slate-500">Download all pending approvals and SOPs from other PCs.</p>
                     </div>
                   </div>
                   <button
@@ -1244,7 +1244,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
                   >
                     {isPullingCloud ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                    <span>ক্লাউড থেকে রিফ্রেশ ও সিঙ্ক করুন</span>
+                    <span>Pull & Sync from Cloud</span>
                   </button>
                 </div>
               </div>
@@ -1253,25 +1253,25 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200 text-xs space-y-3 text-slate-700">
                 <div className="flex items-center gap-2 font-bold text-slate-900">
                   <Globe className="w-4 h-4 text-sky-600" />
-                  <span>কীভাবে ১ মিনিটে ফ্রি ক্লাউড ডাটাবেজ তৈরি করবেন? (Step-by-step Guide)</span>
+                  <span>How to set up a free cloud database in 1 minute (Quick Guide)</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[11px]">
                   <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
-                    <span className="font-bold text-sky-600">১. Firebase তৈরি:</span>
+                    <span className="font-bold text-sky-600">1. Create Firebase:</span>
                     <p className="text-slate-600">
-                      <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="text-blue-600 underline">console.firebase.google.com</a> এ গিয়ে একটি ফ্রি প্রোজেক্ট খুলুন।
+                      <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="text-blue-600 underline">console.firebase.google.com</a>  and create a free project.
                     </p>
                   </div>
                   <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
-                    <span className="font-bold text-sky-600">২. Realtime Database:</span>
+                    <span className="font-bold text-sky-600">2. Realtime Database:</span>
                     <p className="text-slate-600">
-                      "Build" &gt; "Realtime Database" &gt; "Create Database" এ ক্লিক করে Rules এ <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[10px]">read: true, write: true</code> দিয়ে দিন।
+                      "Build" &gt; "Realtime Database" &gt; "Create Database"  and set Rules to <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[10px]">read: true, write: true</code> .
                     </p>
                   </div>
                   <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-1">
-                    <span className="font-bold text-sky-600">৩. URL পেস্ট করুন:</span>
+                    <span className="font-bold text-sky-600">3. Paste URL:</span>
                     <p className="text-slate-600">
-                      ডাটাবেজের উপরের URL-টি কপি করে এখানে পেস্ট করে "সেটিংস সংরক্ষণ করুন" বাটনে ক্লিক করুন। সাথে সাথে সব PC সিঙ্ক শুরু হয়ে যাবে!
+                      Copy your database URL, paste it here, and click "Save Settings". All factory workstations will sync immediately!
                     </p>
                   </div>
                 </div>
@@ -1288,9 +1288,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     <Download className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">মাস্টার ডাটাবেজ ব্যাকআপ (Export JSON)</h3>
+                    <h3 className="text-sm font-bold text-slate-900">Master Database Backup (Export JSON)</h3>
                     <p className="text-xs text-slate-500">
-                      সিস্টেমের সমস্ত ইউজার, পাসওয়ার্ড, গ্লোবাল AI কি এবং সংরক্ষিত SOP একটি JSON ফাইলে সেভ করুন।
+                      Export all system users, credentials, global AI keys, and archived SOP documents into a portable JSON backup file.
                     </p>
                   </div>
                 </div>
@@ -1301,7 +1301,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm transition cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
-                  <span>সম্পূর্ণ ব্যাকআপ ফাইল ডাউনলোড করুন</span>
+                  <span>Download Master Backup (JSON)</span>
                 </button>
               </div>
 
@@ -1311,16 +1311,16 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     <Upload className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">ডাটাবেজ পুনরুদ্ধার (Restore from Backup)</h3>
+                    <h3 className="text-sm font-bold text-slate-900">Restore Database from Backup</h3>
                     <p className="text-xs text-slate-500">
-                      পূর্বের কোনো ব্যাকআপ JSON ফাইল সিলেক্ট করে সমস্ত ডাটা ফিরিয়ে আনুন।
+                      Select a previously exported master backup JSON file to restore the database.
                     </p>
                   </div>
                 </div>
 
                 <label className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer">
                   <Upload className="w-4 h-4" />
-                  <span>JSON ব্যাকআপ ফাইল সিলেক্ট করুন</span>
+                  <span>Select JSON Backup File</span>
                   <input type="file" accept=".json" onChange={handleImportBackup} className="hidden" />
                 </label>
               </div>
@@ -1332,9 +1332,9 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     <Trash2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-rose-950">ডাটাবেজ ও অ্যানালিটিক্স ট্রায়াল ডাটা ক্লিনআপ (Reset Trial Data)</h3>
+                    <h3 className="text-sm font-bold text-rose-950">Trial Data & Test History Cleanup (Reset Trial Data)</h3>
                     <p className="text-xs text-rose-700">
-                      সিস্টেম পরীক্ষার সময় তৈরি হওয়া সমস্ত পরীক্ষামূলক (Trial) SOP ও অ্যানালিটিক্স রেকর্ড সম্পূর্ণ মুছে ফ্রেশ করুন।
+                      Clear all trial SOPs and testing records created during system verification to initialize a clean production database.
                     </p>
                   </div>
                 </div>
@@ -1345,7 +1345,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   className="w-full py-2.5 bg-rose-700 hover:bg-rose-600 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xs transition cursor-pointer"
                 >
                   <Trash2 className="w-4 h-4" />
-                  <span>ট্রায়াল ডাটা ও অ্যানালিটিক্স সম্পূর্ণ রিসেট করুন</span>
+                  <span>Purge All Trial Data & Reset Analytics</span>
                 </button>
               </div>
             </div>
@@ -1359,7 +1359,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               <div className="flex items-center justify-between border-b pb-2.5">
                 <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                   <UserPlus className="w-4 h-4 text-rose-700" />
-                  <span>নতুন কর্মকর্তা যুক্ত করুন</span>
+                  <span>+ Add New Official</span>
                 </h4>
                 <button
                   type="button"
@@ -1373,13 +1373,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               <form onSubmit={handleAddUser} className="space-y-3 text-xs">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    ইউজার আইডি / ইউজারনেম (Login ID) *
+                    User ID / Username (Login ID) *
                   </label>
                   <input
                     type="text"
                     value={newUserId}
                     onChange={(e) => setNewUserId(e.target.value)}
-                    placeholder="যেমন: Tanvir, Shanto"
+                    placeholder="e.g. Tanvir, Shanto"
                     required
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600 font-mono"
                   />
@@ -1387,26 +1387,26 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    এমপ্লয়ী আইডি (Walton ID)
+                    Employee ID (Walton ID)
                   </label>
                   <input
                     type="text"
                     value={newUserEmpId}
                     onChange={(e) => setNewUserEmpId(e.target.value)}
-                    placeholder="যেমন: 54634, 67544"
+                    placeholder="e.g. 54634, 67544"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600 font-mono"
                   />
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    পূর্ণ নাম (Full Name) *
+                    Full Name *
                   </label>
                   <input
                     type="text"
                     value={newUserName}
                     onChange={(e) => setNewUserName(e.target.value)}
-                    placeholder="যেমন: Tanvir Ahmed"
+                    placeholder="e.g. Tanvir Ahmed"
                     required
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600"
                   />
@@ -1414,54 +1414,54 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    অনুমোদনের সিকোয়েন্স / রোল (Approval Routing Step) *
+                    Approval Route Role / Sequence *
                   </label>
                   <select
                     value={newUserRole}
                     onChange={(e) => setNewUserRole(e.target.value as UserRole)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600 font-semibold"
                   >
-                    <option value="prepared_by">ধাপ ১: প্রস্তুতকারী (Process concern)</option>
-                    <option value="checked_by">ধাপ ২: পর্যালোচক (Section In charge)</option>
-                    <option value="approved_by">ধাপ ৩: চূড়ান্ত অনুমোদনকারী (Process HOD)</option>
+                    <option value="prepared_by">Step 1: Prepared By (Process Concern)</option>
+                    <option value="checked_by">Step 2: Reviewed By (Section In-Charge)</option>
+                    <option value="approved_by">Step 3: Final Approved By (Process HOD)</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    পদবী (Designation)
+                    Designation
                   </label>
                   <input
                     type="text"
                     value={newUserDesignation}
                     onChange={(e) => setNewUserDesignation(e.target.value)}
-                    placeholder="যেমন: Assistant Director, Process Engineer"
+                    placeholder="e.g. Assistant Director, Process Engineer"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600"
                   />
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    বিভাগ (Department)
+                    Department
                   </label>
                   <input
                     type="text"
                     value={newUserDepartment}
                     onChange={(e) => setNewUserDepartment(e.target.value)}
-                    placeholder="যেমন: Process Development, QA"
+                    placeholder="e.g. Process Development, QA"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600"
                   />
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    ডিফল্ট পাসওয়ার্ড (Default Password)
+                    Default Password
                   </label>
                   <input
                     type="text"
                     value={newUserPassword}
                     onChange={(e) => setNewUserPassword(e.target.value)}
-                    placeholder="ডিফল্ট: Process@2026"
+                    placeholder="Default: Process@2026"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600 font-mono"
                   />
                 </div>
@@ -1472,13 +1472,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     onClick={() => setIsAddModalOpen(false)}
                     className="px-3.5 py-1.5 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 font-semibold"
                   >
-                    বাতিল
+                    Cancel
                   </button>
                   <button
                     type="submit"
                     className="px-4 py-1.5 rounded-xl bg-rose-700 hover:bg-rose-600 text-white font-bold shadow-xs transition cursor-pointer"
                   >
-                    যুক্ত করুন
+                    Add User
                   </button>
                 </div>
               </form>
@@ -1493,7 +1493,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               <div className="flex items-center justify-between border-b pb-2.5">
                 <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                   <Edit2 className="w-4 h-4 text-blue-600" />
-                  <span>কর্মকর্তার তথ্য ও সিকোয়েন্স এডিট: {editingUser.id}</span>
+                  <span>Edit User Details & Route: {editingUser.id}</span>
                 </h4>
                 <button
                   type="button"
@@ -1507,7 +1507,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               <form onSubmit={handleSaveEdit} className="space-y-3 text-xs">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    ইউজার আইডি (অপরিবর্তনীয়)
+                    User ID (Read-only)
                   </label>
                   <input
                     type="text"
@@ -1519,20 +1519,20 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    এমপ্লয়ী আইডি (Walton ID)
+                    Employee ID (Walton ID)
                   </label>
                   <input
                     type="text"
                     value={editEmpId}
                     onChange={(e) => setEditEmpId(e.target.value)}
-                    placeholder="যেমন: 54634, 67544"
+                    placeholder="e.g. 54634, 67544"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600 font-mono"
                   />
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    পূর্ণ নাম (Full Name) *
+                    Full Name *
                   </label>
                   <input
                     type="text"
@@ -1545,23 +1545,23 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    অনুমোদনের সিকোয়েন্স / রোল (Approval Routing Step) *
+                    Approval Route Role / Sequence *
                   </label>
                   <select
                     value={editRole}
                     onChange={(e) => setEditRole(e.target.value as UserRole)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600 font-semibold"
                   >
-                    <option value="prepared_by">ধাপ ১: প্রস্তুতকারী (Process concern)</option>
-                    <option value="checked_by">ধাপ ২: পর্যালোচক (Section In charge)</option>
-                    <option value="approved_by">ধাপ ৩: চূড়ান্ত অনুমোদনকারী (Process HOD)</option>
-                    <option value="admin">সুপার অ্যাডমিন (System Administrator)</option>
+                    <option value="prepared_by">Step 1: Prepared By (Process Concern)</option>
+                    <option value="checked_by">Step 2: Reviewed By (Section In-Charge)</option>
+                    <option value="approved_by">Step 3: Final Approved By (Process HOD)</option>
+                    <option value="admin">Super Admin (System Administrator)</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    পদবী (Designation)
+                    Designation
                   </label>
                   <input
                     type="text"
@@ -1573,7 +1573,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    বিভাগ (Department)
+                    Department
                   </label>
                   <input
                     type="text"
@@ -1589,13 +1589,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     onClick={() => setEditingUser(null)}
                     className="px-3.5 py-1.5 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 font-semibold"
                   >
-                    বাতিল
+                    Cancel
                   </button>
                   <button
                     type="submit"
                     className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold shadow-xs transition cursor-pointer"
                   >
-                    আপডেট সংরক্ষণ করুন
+                    Save Changes
                   </button>
                 </div>
               </form>
@@ -1610,7 +1610,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               <div className="flex items-center justify-between border-b pb-2">
                 <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                   <KeyRound className="w-4 h-4 text-blue-600" />
-                  <span>পাসওয়ার্ড রিসেট: {selectedUserForReset.name}</span>
+                  <span>Reset Password: {selectedUserForReset.name}</span>
                 </h4>
                 <button
                   type="button"
@@ -1623,13 +1623,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  নতুন পাসওয়ার্ড লিখুন:
+                  Enter New Password:
                 </label>
                 <input
                   type="text"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="যেমন: Process@2026 বা নতুন কিছু"
+                  placeholder="e.g. Process@2026 or new password"
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-blue-500 font-mono"
                   autoFocus
                 />
@@ -1641,7 +1641,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   onClick={() => setSelectedUserForReset(null)}
                   className="px-3 py-1.5 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 text-xs font-semibold"
                 >
-                  বাতিল
+                  Cancel
                 </button>
                 <button
                   type="button"
@@ -1649,7 +1649,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   disabled={!newPassword.trim()}
                   className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-slate-300 text-white text-xs font-bold shadow-xs transition cursor-pointer"
                 >
-                  সেভ করুন
+                  Update Password
                 </button>
               </div>
             </div>

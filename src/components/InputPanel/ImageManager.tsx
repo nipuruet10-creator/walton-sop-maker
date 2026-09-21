@@ -74,7 +74,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
 
       if (imageFiles.length > 0) {
         e.preventDefault();
-        processNewFiles(imageFiles, 'ক্লিপবোর্ড থেকে ছবি পেস্ট করা হয়েছে!');
+        processNewFiles(imageFiles, 'Image successfully pasted from clipboard!');
       }
     };
 
@@ -85,7 +85,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
   const processNewFiles = (files: File[], successMsg: string) => {
     const remainingSlots = 9 - photos.length;
     if (remainingSlots <= 0) {
-      alert('SOP লেআউটে সর্বোচ্চ ৯টি ছবি যুক্ত করা যাবে।');
+      alert('Maximum of 9 photos can be added to the SOP layout.');
       return;
     }
 
@@ -116,7 +116,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    processNewFiles(Array.from(files), 'ছবি সফলভাবে আপলোড হয়েছে!');
+    processNewFiles(Array.from(files), 'Image uploaded successfully!');
   };
 
   // Drag & Drop handlers
@@ -137,7 +137,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
     if (files && files.length > 0) {
       const imageFiles = Array.from(files).filter((f) => f.type.startsWith('image/'));
       if (imageFiles.length > 0) {
-        processNewFiles(imageFiles, 'ড্র্যাগ অ্যান্ড ড্রপ ছবি যুক্ত হয়েছে!');
+        processNewFiles(imageFiles, 'Drag-and-drop image added!');
       }
     }
   };
@@ -160,7 +160,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         name: file.name,
       };
       onChange(reindex(updated));
-      showToast('ছবি সফলভাবে পরিবর্তন করা হয়েছে!');
+      showToast('Image replaced successfully!');
       if (replaceInputRef.current) replaceInputRef.current.value = '';
       replaceTargetIndex.current = null;
     };
@@ -180,7 +180,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
 
   const handleDelete = (index: number) => {
     if (photos.length <= 4) {
-      if (!confirm('SOP লেআউটের জন্য কমপক্ষে ৪টি ছবি রাখা বাঞ্ছনীয়। আপনি কি নিশ্চিত যে ছবিটি মুছতে চান?')) {
+      if (!confirm('At least 4 photos are recommended for standard SOP layout. Are you sure you want to delete this photo?')) {
         return;
       }
     }
@@ -196,7 +196,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
       url: annotatedBase64,
     };
     onChange(reindex(updated));
-    showToast('ছবিতে ড্রয়িং ও মার্কিং সফলভাবে সংরক্ষিত হয়েছে!');
+    showToast('Photo annotations saved successfully!');
     setAnnotatingIndex(null);
   };
 
@@ -248,7 +248,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
           <div>
             <label className="block text-[10.5px] font-semibold text-blue-950 mb-1 flex items-center gap-1">
               <Maximize className="w-3 h-3 text-blue-600" />
-              <span>ছবি ফিট (Aspect Ratio)</span>
+              <span>Aspect Ratio</span>
             </label>
             <div className="flex bg-white rounded-lg border border-blue-300 p-0.5">
               <button
@@ -257,9 +257,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 className={`flex-1 py-1 text-[11px] font-medium rounded transition cursor-pointer ${
                   imageFit === 'contain' ? 'bg-blue-600 text-white font-bold' : 'text-slate-600 hover:bg-slate-50'
                 }`}
-                title="সম্পূর্ণ ছবি দেখাও, কোনো ছবি লম্বা বা চ্যাপ্টা হবে না"
+                title="Fit image naturally without cropping"
               >
-                Fit (ন্যাচারাল)
+                Fit
               </button>
               <button
                 type="button"
@@ -267,9 +267,9 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 className={`flex-1 py-1 text-[11px] font-medium rounded transition cursor-pointer ${
                   imageFit === 'cover' ? 'bg-blue-600 text-white font-bold' : 'text-slate-600 hover:bg-slate-50'
                 }`}
-                title="ঘর সম্পূর্ণ পূর্ণ করো"
+                title="Fill entire cell boundary"
               >
-                Fill (ঘর পূর্ণ)
+                Fill
               </button>
             </div>
           </div>
@@ -277,17 +277,17 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
           <div>
             <label className="block text-[10.5px] font-semibold text-blue-950 mb-1 flex items-center gap-1">
               <LayoutGrid className="w-3 h-3 text-blue-600" />
-              <span>কলাম লেআউট</span>
+              <span>Column Layout</span>
             </label>
             <select
               value={gridCols}
               onChange={(e) => onUpdateGridCols?.(parseInt(e.target.value, 10))}
               className="w-full bg-white border border-blue-300 rounded-lg px-2 py-1 text-[11px] text-slate-800 focus:outline-none"
             >
-              <option value={0}>Auto (সঠিক আকার)</option>
-              <option value={3}>3 Columns (ওয়ালটন স্ট্যান্ডার্ড)</option>
-              <option value={2}>2 Columns (বড় ছবি)</option>
-              <option value={4}>4 Columns (কমপ্যাক্ট)</option>
+              <option value={0}>Auto (Optimal)</option>
+              <option value={3}>3 Columns (Standard)</option>
+              <option value={2}>2 Columns (Large)</option>
+              <option value={4}>4 Columns (Compact)</option>
             </select>
           </div>
         </div>
@@ -296,7 +296,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         <div className="flex items-center gap-1.5 text-[11px] text-blue-800 bg-white/70 p-2 rounded-lg border border-blue-200/60">
           <ClipboardPaste className="w-3.5 h-3.5 text-blue-600 shrink-0" />
           <span>
-            <strong>টিপ:</strong> স্ক্রিনশট নিয়ে সরাসরি <strong>Ctrl+V</strong> চাপুন বা ড্র্যাগ করে ফেলুন। ছবিতে লাল বক্স ও তীরচিহ্ন দিতে <strong>"এডিট / চিহ্নিত"</strong> বাটনে ক্লিক করুন।
+            <strong>Tip:</strong> Copy any screenshot and press <strong>Ctrl+V</strong> to paste directly. Click <strong>"Annotate"</strong> to draw arrows and highlight boxes.
           </span>
         </div>
       </div>
@@ -304,7 +304,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
       {photos.length < 4 && (
         <div className="flex items-center gap-2 text-xs bg-amber-50 text-amber-800 p-2.5 rounded-xl border border-amber-200">
           <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
-          <span>অনুকূল SOP ডিজাইনের জন্য কমপক্ষে ৪টি ছবি আপলোড করার পরামর্শ দেওয়া হচ্ছে।</span>
+          <span>At least 4 photos are recommended for standard SOP layout.</span>
         </div>
       )}
 
@@ -323,10 +323,10 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
         >
           <div className="flex items-center gap-2 text-slate-700 group-hover:text-blue-700 font-semibold">
             <Upload className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition" />
-            <span>+ নতুন ছবি আপলোড করুন ({9 - photos.length} টি বাকি)</span>
+            <span>+ Upload Photo ({9 - photos.length} remaining)</span>
           </div>
           <p className="text-[10.5px] text-slate-500">
-            এখানে ছবি ড্র্যাগ ও ড্রপ করুন অথবা কপি করে সরাসরি <kbd className="px-1.5 py-0.5 bg-slate-200 text-slate-800 rounded font-mono text-[10px]">Ctrl+V</kbd> পেস্ট করুন
+            Drag & drop images here or copy and press <kbd className="px-1.5 py-0.5 bg-slate-200 text-slate-800 rounded font-mono text-[10px]">Ctrl+V</kbd> to paste
           </p>
         </div>
       )}
@@ -361,7 +361,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 </span>
               </div>
               <span className="text-[10px] text-slate-400 block mt-0.5">
-                অবস্থান #{index + 1}
+                Position #{index + 1}
               </span>
             </div>
 
@@ -375,10 +375,10 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                   setAnnotatingIndex(index);
                 }}
                 className="flex items-center gap-1 px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-[11px] font-bold transition cursor-pointer"
-                title="ছবি ক্রপ / সাইজ কেটে সোজা করুন"
+                title="Crop & straighten image"
               >
                 <Crop className="w-3.5 h-3.5 text-amber-600" />
-                <span className="hidden sm:inline">ক্রপ</span>
+                <span className="hidden sm:inline">Crop</span>
               </button>
 
               {/* Annotate / Mark Button */}
@@ -389,10 +389,10 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                   setAnnotatingIndex(index);
                 }}
                 className="flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-[11px] font-bold transition cursor-pointer"
-                title="ছবিতে লাল বক্স, তীরচিহ্ন, ও ড্রয়িং যোগ করুন"
+                title="Add red highlight box, arrows, and drawings"
               >
                 <Layers className="w-3.5 h-3.5 text-red-600" />
-                <span className="hidden sm:inline">চিহ্নিত করুন</span>
+                <span className="hidden sm:inline">Annotate</span>
               </button>
 
               <button
@@ -400,7 +400,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 onClick={() => handleMove(index, 'up')}
                 disabled={index === 0}
                 className="p-1 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg disabled:opacity-30 transition cursor-pointer"
-                title="উপরে নিন"
+                title="Move Up"
               >
                 <ArrowUp className="w-3.5 h-3.5" />
               </button>
@@ -409,7 +409,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 onClick={() => handleMove(index, 'down')}
                 disabled={index === photos.length - 1}
                 className="p-1 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg disabled:opacity-30 transition cursor-pointer"
-                title="নিচে নিন"
+                title="Move Down"
               >
                 <ArrowDown className="w-3.5 h-3.5" />
               </button>
@@ -417,7 +417,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 type="button"
                 onClick={() => handleReplace(index)}
                 className="p-1 text-slate-500 hover:text-emerald-600 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                title="ছবি পরিবর্তন করুন"
+                title="Replace Image"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
@@ -425,7 +425,7 @@ export const ImageManager: React.FC<ImageManagerProps> = ({
                 type="button"
                 onClick={() => handleDelete(index)}
                 className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                title="ছবি মুছুন"
+                title="Delete Photo"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>

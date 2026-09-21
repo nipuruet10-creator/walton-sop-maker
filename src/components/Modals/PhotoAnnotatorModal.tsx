@@ -305,7 +305,7 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
     if (selectedTool === 'pen') {
       setCurrentPoints([coords]);
     } else if (selectedTool === 'text') {
-      const textVal = prompt('টেক্সট বা লেবেল লিখুন (যেমন: ১, ২, বা সুইচ):');
+      const textVal = prompt('Enter text or label (e.g. 1, 2, or Switch):');
       if (textVal) {
         const newAction: AnnotationAction = {
           tool: 'text',
@@ -435,7 +435,7 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
     const h = Math.min(canvas.height - y, Math.abs(cropSelection.endY - cropSelection.startY));
 
     if (w < 15 || h < 15) {
-      alert('ক্রপ করার জন্য অনুগ্রহ করে একটু বড় এরিয়া নির্বাচন করুন।');
+      alert('Please drag to select a larger crop area.');
       return;
     }
 
@@ -524,7 +524,7 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
 
   const handleClear = () => {
     if (history.length === 0 && !cropSelection) return;
-    if (confirm('আপনি কি সব মার্কিং ও ড্রয়িং মুছে ফেলতে চান?')) {
+    if (confirm('Are you sure you want to clear all markings and drawings?')) {
       setHistory([]);
       setRedoList([]);
       setCropSelection(null);
@@ -591,13 +591,13 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
             </span>
             <div>
               <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                <span>ছবিতে চিহ্নিতকরণ ও ড্রয়িং এডিটর</span>
+                <span>Photo Annotation & Drawing Editor</span>
                 <span className="text-xs px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">
                   {photoLabel}
                 </span>
               </h3>
               <p className="text-[11px] text-slate-400">
-                লাল বক্স, তীরচিহ্ন, বা বৃত্ত দিয়ে ছবির গুরুত্বপূর্ণ পার্টস বা বাটন হাইলাইট করুন
+                Highlight critical components, connectors, or buttons using boxes, arrows, circles, and labels
               </p>
             </div>
           </div>
@@ -627,10 +627,10 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
                   ? 'bg-amber-600 text-white font-bold shadow-xs'
                   : 'text-amber-400 hover:bg-slate-700/60'
               }`}
-              title="Crop Image (ছবি ক্রপ করুন)"
+              title="Crop Image"
             >
               <Crop className="w-4 h-4" />
-              <span>ক্রপ (Crop)</span>
+              <span>Crop</span>
             </button>
 
             <div className="w-px h-5 bg-slate-700 mx-0.5" />
@@ -647,10 +647,10 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
                   ? 'bg-red-600 text-white font-bold shadow-xs'
                   : 'text-slate-300 hover:bg-slate-700/60'
               }`}
-              title="Rectangle Box (বক্স)"
+              title="Rectangle Box"
             >
               <Square className="w-4 h-4" />
-              <span>বক্স (Box)</span>
+              <span>Box</span>
             </button>
 
             <button
@@ -665,10 +665,10 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
                   ? 'bg-red-600 text-white font-bold shadow-xs'
                   : 'text-slate-300 hover:bg-slate-700/60'
               }`}
-              title="Arrow (তীরচিহ্ন)"
+              title="Arrow"
             >
               <MoveRight className="w-4 h-4" />
-              <span>তীর (Arrow)</span>
+              <span>Arrow</span>
             </button>
 
             <button
@@ -683,10 +683,10 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
                   ? 'bg-red-600 text-white font-bold shadow-xs'
                   : 'text-slate-300 hover:bg-slate-700/60'
               }`}
-              title="Circle (বৃত্ত)"
+              title="Circle"
             >
               <Circle className="w-4 h-4" />
-              <span>বৃত্ত (Circle)</span>
+              <span>Circle</span>
             </button>
 
             <button
@@ -701,10 +701,10 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
                   ? 'bg-red-600 text-white font-bold shadow-xs'
                   : 'text-slate-300 hover:bg-slate-700/60'
               }`}
-              title="Freehand Pen (মার্কার / মুক্তহস্তে)"
+              title="Freehand Pen"
             >
               <PenTool className="w-4 h-4" />
-              <span>মার্কার (Pen)</span>
+              <span>Pen</span>
             </button>
 
             <button
@@ -719,10 +719,10 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
                   ? 'bg-red-600 text-white font-bold shadow-xs'
                   : 'text-slate-300 hover:bg-slate-700/60'
               }`}
-              title="Text Callout (টেক্সট / লেবেল)"
+              title="Text Callout"
             >
               <Type className="w-4 h-4" />
-              <span>টেক্সট (Text)</span>
+              <span>Text</span>
             </button>
           </div>
 
@@ -781,7 +781,7 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
               onClick={handleUndo}
               disabled={history.length === 0 && imageUndoStack.length === 0}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40 transition cursor-pointer"
-              title="Undo (পূর্বাবস্থায় ফেরান / ক্রপ আনডু)"
+              title="Undo (Ctrl+Z)"
             >
               <Undo2 className="w-4 h-4" />
             </button>
@@ -799,7 +799,7 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
               onClick={handleClear}
               disabled={history.length === 0 && !cropSelection}
               className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/60 text-slate-300 hover:text-rose-200 disabled:opacity-40 transition cursor-pointer"
-              title="Clear All (সব মুছুন)"
+              title="Clear All Markings"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -812,7 +812,7 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
             <div className="flex items-center gap-2 text-amber-200">
               <Crop className="w-4 h-4 text-amber-400 shrink-0" />
               <span>
-                কাঙ্ক্ষিত ক্রপ সাইজ নির্বাচন করা হয়েছে: <strong className="text-amber-300 font-mono font-bold">{Math.round(Math.abs(cropSelection.endX - cropSelection.startX))} × {Math.round(Math.abs(cropSelection.endY - cropSelection.startY))} px</strong>
+                Selected crop dimension: <strong className="text-amber-300 font-mono font-bold">{Math.round(Math.abs(cropSelection.endX - cropSelection.startX))} × {Math.round(Math.abs(cropSelection.endY - cropSelection.startY))} px</strong>
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -821,7 +821,7 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
                 onClick={handleCancelCrop}
                 className="px-3 py-1.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-medium transition cursor-pointer"
               >
-                বাতিল (Cancel)
+                Cancel
               </button>
               <button
                 type="button"
@@ -829,7 +829,7 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-bold shadow-md transition cursor-pointer"
               >
                 <Check className="w-4 h-4" />
-                <span>✂️ ক্রপ প্রয়োগ করুন (Apply Crop)</span>
+                <span>✂️ Apply Crop</span>
               </button>
             </div>
           </div>
@@ -839,7 +839,7 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
           <div className="px-5 py-2 bg-slate-950 border-b border-amber-500/30 flex items-center justify-between text-xs text-amber-300">
             <div className="flex items-center gap-2">
               <Crop className="w-4 h-4 text-amber-400" />
-              <span>ছবির যে অংশটুকু রাখতে চান, মাউস দিয়ে সেটির চারদিকে ড্র্যাগ করে ক্রপ বক্স আঁকুন।</span>
+              <span>Drag the mouse over the photo to define the crop boundary.</span>
             </div>
           </div>
         )}
@@ -860,11 +860,11 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
         <div className="flex items-center justify-between px-5 py-3 border-t border-slate-800 bg-slate-950/80">
           <div className="text-xs text-slate-400">
             {selectedTool === 'crop' ? (
-              <span className="text-amber-400 font-medium">✂️ ক্রপ মোড সক্রিয়: ড্র্যাগ করে অংশ নির্বাচন করুন ও 'ক্রপ প্রয়োগ করুন' চাপুন।</span>
+              <span className="text-amber-400 font-medium">✂️ Crop mode active: Drag to select area and click 'Apply Crop'.</span>
             ) : history.length > 0 ? (
-              <span>{history.length} টি মার্কিং যুক্ত করা হয়েছে</span>
+              <span>{history.length} annotation(s) added</span>
             ) : (
-              <span>ছবিতে ড্র্যাগ করে বক্স বা তীরচিহ্ন আঁকুন</span>
+              <span>Click and drag on photo to draw annotations</span>
             )}
           </div>
 
@@ -874,7 +874,7 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
               onClick={onClose}
               className="px-4 py-1.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold transition cursor-pointer"
             >
-              বাতিল (Cancel)
+              Cancel
             </button>
             <button
               type="button"
@@ -882,7 +882,7 @@ export const PhotoAnnotatorModal: React.FC<PhotoAnnotatorModalProps> = ({
               className="flex items-center gap-1.5 px-5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-md transition cursor-pointer"
             >
               <Check className="w-4 h-4" />
-              <span>সংরক্ষণ করুন (Save & Apply)</span>
+              <span>Save & Apply</span>
             </button>
           </div>
         </div>

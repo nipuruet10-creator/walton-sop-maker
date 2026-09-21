@@ -128,7 +128,9 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
   const handleDownloadPdf = async (sop: SOPDocument) => {
     setDownloadingId(sop.id || 'temp');
     try {
-      await downloadSOPAsPdf('sop-paper', sop.header.processName);
+      onSelectSop(sop);
+      await new Promise(r => setTimeout(r, 200));
+      await downloadSOPAsPdf('sop-paper', sop.header.processName, sop.header.referenceNo);
     } catch (e: any) {
       alert('PDF generation error: ' + (e.message || 'Unknown error'));
     } finally {
@@ -159,13 +161,13 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
         processName: `${doc.header.processName} (Copy)`,
       },
     };
-    await saveSOP(copy, currentUser, 'ডুপ্লিকেট কপি তৈরি করা হয়েছে');
+    await saveSOP(copy, currentUser, 'Duplicate copy created');
     await fetchDocs();
-    alert('SOP সফলভাবে কপি করা হয়েছে!');
+    alert('SOP successfully duplicated as new draft!');
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (confirm(`আপনি কি নিশ্চিতভাবে "${name || 'এই SOP'}" টি চিরতরে মুছে ফেলতে চান?`)) {
+    if (confirm(`Are you sure you want to permanently delete "${name || 'this SOP'}"?`)) {
       await deleteSOP(id);
       await fetchDocs();
     }
@@ -192,34 +194,34 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
         return (
           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-            <span>চূড়ান্ত অনুমোদিত</span>
+            <span>Approved</span>
           </span>
         );
       case 'forwarded_to_approver':
         return (
           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300 flex items-center gap-1">
             <Clock className="w-3 h-3 text-purple-600" />
-            <span>অনুমোদনে মুলতবি (Process HOD)</span>
+            <span>Pending Approval (Process HOD)</span>
           </span>
         );
       case 'forwarded_to_checker':
         return (
           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300 flex items-center gap-1">
             <Send className="w-3 h-3 text-blue-600" />
-            <span>পর্যালোচনাধীন (Section In charge)</span>
+            <span>Under Review (Section In-Charge)</span>
           </span>
         );
       case 'rejected':
         return (
           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
             <RotateCcw className="w-3 h-3 text-rose-600" />
-            <span>সংশোধনে ফেরত</span>
+            <span>Revision Requested</span>
           </span>
         );
       default:
         return (
           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-300">
-            খসড়া (Draft)
+            Draft
           </span>
         );
     }
@@ -236,13 +238,13 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold tracking-tight">Walton SOP Archive (এসওপি আর্কাইভ)</h2>
+                <h2 className="text-base font-bold tracking-tight">Walton SOP Master Archive</h2>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
                   Total: {allDocs.length} SOPs
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                সকল অনুমোদিত ও প্রস্তুতকৃত SOP কেন্দ্রীয় আর্কাইভ, প্রস্তুতকারী অনুযায়ী ফিল্টারিং এবং স্থায়ী ব্যাকআপ
+                Centralized repository of all standard operating procedures with author filtering and verified storage
               </p>
             </div>
           </div>
@@ -261,7 +263,7 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
           <div className="flex items-center gap-2 text-slate-600">
             <HardDrive className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>
-              <strong>স্থায়ী স্টোরেজ সক্রিয়:</strong> আপনার সমস্ত SOP ব্রাউজারের উচ্চ-ধারণক্ষমতার IndexedDB-তে স্থায়ীভাবে সংরক্ষিত থাকে।
+              <strong>Persistent Storage Active:</strong> All SOP documents are stored in local high-capacity browser IndexedDB.
             </span>
           </div>
 
@@ -271,7 +273,7 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
             className="flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-blue-600" />
-            <span>মাস্টার ব্যাকআপ (JSON) ডাউনলোড</span>
+            <span>Download Master Backup (JSON)</span>
           </button>
         </div>
 
@@ -290,7 +292,7 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
                 }`}
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>অনুমোদিত SOP ({allDocs.filter((d) => d.status === 'approved').length})</span>
+                <span>Approved SOPs ({allDocs.filter((d) => d.status === 'approved').length})</span>
               </button>
 
               <button
@@ -303,7 +305,7 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
                 }`}
               >
                 <FolderArchive className="w-3.5 h-3.5" />
-                <span>সকল SOP আর্কাইভ ({allDocs.length})</span>
+                <span>All SOP Archive ({allDocs.length})</span>
               </button>
             </div>
 
@@ -314,17 +316,17 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="প্রসেস নাম, মডেল, লাইন বা আইডি দিয়ে খুঁজুন..."
+                placeholder="Search by process name, model, line or ID..."
                 className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-blue-600"
               />
             </div>
           </div>
 
-          {/* Grouping / Filter by "Prepared by" (Prepare by er name wise) */}
+          {/* Grouping / Filter by "Prepared by" */}
           <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
             <span className="font-bold text-slate-700 flex items-center gap-1">
               <Users className="w-3.5 h-3.5 text-blue-600" />
-              <span>প্রস্তুতকারী ফিল্টার:</span>
+              <span>Author Filter:</span>
             </span>
 
             <div className="flex flex-wrap items-center gap-1">
@@ -337,7 +339,7 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                সকল প্রস্তুতকারী
+                All Authors
               </button>
 
               {uniqueAuthors.map((author) => (
@@ -359,18 +361,18 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
             {/* Status Filter */}
             {activeTab === 'all_archive' && (
               <div className="ml-auto flex items-center gap-1.5">
-                <span className="text-slate-500 font-medium">স্ট্যাটাস:</span>
+                <span className="text-slate-500 font-medium">Status:</span>
                 <select
                   value={selectedStatus}
                   onChange={(e) => setSelectedStatus(e.target.value)}
                   className="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-800 focus:outline-none"
                 >
-                  <option value="all">সকল স্ট্যাটাস</option>
-                  <option value="draft">খসড়া (Draft)</option>
-                  <option value="forwarded_to_checker">পর্যালোচনাধীন (Section In charge)</option>
-                  <option value="forwarded_to_approver">অনুমোদনে মুলতবি (Process HOD)</option>
-                  <option value="approved">চূড়ান্ত অনুমোদিত</option>
-                  <option value="rejected">সংশোধনে ফেরত</option>
+                  <option value="all">All Statuses</option>
+                  <option value="draft">Draft</option>
+                  <option value="forwarded_to_checker">Under Review (Section In-Charge)</option>
+                  <option value="forwarded_to_approver">Pending Approval (Process HOD)</option>
+                  <option value="approved">Officially Approved</option>
+                  <option value="rejected">Revision Requested</option>
                 </select>
               </div>
             )}
@@ -381,21 +383,23 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
         <div className="flex-1 overflow-y-auto p-5 bg-slate-100/70 space-y-3">
           {loading ? (
             <div className="py-16 text-center text-slate-400 text-xs">
-              লোড হচ্ছে... অনুগ্রহ করে অপেক্ষা করুন।
+              Loading SOP documents... Please wait.
             </div>
           ) : filteredDocs.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 text-center border border-dashed border-slate-300 space-y-3">
               <FolderArchive className="w-12 h-12 text-slate-300 mx-auto" />
-              <h3 className="font-bold text-slate-700 text-sm">কোনো SOP পাওয়া যায়নি</h3>
+              <h3 className="font-bold text-slate-700 text-sm">No SOPs Found</h3>
               <p className="text-xs text-slate-400 max-w-sm mx-auto">
                 {activeTab === 'approved_sops'
-                  ? 'এখনও কোনো SOP চূড়ান্তভাবে অনুমোদিত হয়নি। কামরুল হাসান (Process HOD) অনুমোদন করলে তা এখানে চলে আসবে।'
-                  : 'বর্তমান ফিল্টারের আওতায় কোনো সংরক্ষিত SOP পাওয়া যায়নি।'}
+                  ? 'No SOPs have been finalized & approved yet. Once Process HOD (Kamrul) grants final approval, they will appear here.'
+                  : 'No standard operating procedures matched the selected filters.'}
               </p>
             </div>
           ) : (
             filteredDocs.map((doc) => {
               const canDelete = currentUser?.role === 'admin' || doc.authorId === currentUser?.id;
+              const isApproved = doc.status === 'approved';
+
               return (
                 <div
                   key={doc.id}
@@ -411,69 +415,84 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                        <span>মডেল: <strong>{doc.header.model || 'N/A'}</strong></span>
+                        <span>Model: <strong>{doc.header.model || 'N/A'}</strong></span>
                         <span>•</span>
-                        <span>লাইন: <strong>{doc.header.stationLine || 'N/A'}</strong></span>
+                        <span>Line: <strong>{doc.header.stationLine || 'N/A'}</strong></span>
                         <span>•</span>
-                        <span>রেফারেন্স: <strong className="font-mono">{doc.header.referenceNo || 'N/A'}</strong></span>
+                        <span>Ref No: <strong className="font-mono">{doc.header.referenceNo || 'N/A'}</strong></span>
                         <span>•</span>
-                        <span>ছবি: <strong>{doc.photos.length} টি</strong></span>
+                        <span>Photos: <strong>{doc.photos.length}</strong></span>
                       </div>
                     </div>
 
-                    {/* Action Buttons */}
+                    {/* Action Buttons: Strict Rule 4: If approved, ONLY PDF download option allowed */}
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenSop(doc)}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
-                        title="এই SOP ক্যানভাসে ওপেন করুন"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>ওপেন</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadPdf(doc)}
-                        disabled={downloadingId === doc.id}
-                        className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer disabled:opacity-50"
-                        title="PDF ডাউনলোড করুন"
-                      >
-                        <FileDown className="w-3.5 h-3.5 text-blue-600" />
-                        <span>{downloadingId === doc.id ? 'তৈরি...' : 'PDF'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadExcel(doc)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
-                        title="Excel ডাউনলোড করুন"
-                      >
-                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Excel</span>
-                      </button>
-
-                      {currentUser && (
+                      {isApproved ? (
                         <button
                           type="button"
-                          onClick={() => handleDuplicate(doc)}
-                          className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
-                          title="কপি তৈরি করুন"
+                          onClick={() => handleDownloadPdf(doc)}
+                          disabled={downloadingId === doc.id}
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer disabled:opacity-50 active:scale-95"
+                          title="Download Official Approved PDF"
                         >
-                          <Copy className="w-4 h-4" />
+                          <FileDown className="w-3.5 h-3.5" />
+                          <span>{downloadingId === doc.id ? 'Generating...' : 'Download PDF'}</span>
                         </button>
-                      )}
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleOpenSop(doc)}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+                            title="Open SOP in Editor"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            <span>Open</span>
+                          </button>
 
-                      {canDelete && (
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(doc.id!, doc.header.processName)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                          title="মুছে ফেলুন"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadPdf(doc)}
+                            disabled={downloadingId === doc.id}
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+                            title="Download PDF"
+                          >
+                            <FileDown className="w-3.5 h-3.5 text-blue-600" />
+                            <span>{downloadingId === doc.id ? 'Generating...' : 'PDF'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadExcel(doc)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer"
+                            title="Download Excel"
+                          >
+                            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Excel</span>
+                          </button>
+
+                          {currentUser && (
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicate(doc)}
+                              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                              title="Duplicate as New Draft"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(doc.id!, doc.header.processName)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                              title="Delete SOP"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -482,22 +501,22 @@ export const MasterArchiveModal: React.FC<MasterArchiveModalProps> = ({
                   <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between text-[11px] text-slate-400">
                     <div className="flex items-center gap-3">
                       <span>
-                        প্রস্তুতকারী (Process concern): <strong className="text-slate-700">{doc.authorName || doc.header.preparedBy.name || 'N/A'}</strong>
+                        Author (Prepared By): <strong className="text-slate-700">{doc.authorName || doc.header.preparedBy.name || 'N/A'}</strong>
                       </span>
                       {doc.checkedByName && (
                         <span>
-                          পর্যালোচক (Section In charge): <strong className="text-slate-700">{doc.checkedByName}</strong>
+                          Reviewer (Checked By): <strong className="text-slate-700">{doc.checkedByName}</strong>
                         </span>
                       )}
                       {doc.approvedByName && (
                         <span>
-                          অনুমোদনকারী (Process HOD): <strong className="text-slate-700">{doc.approvedByName}</strong>
+                          Approver (Process HOD): <strong className="text-slate-700">{doc.approvedByName}</strong>
                         </span>
                       )}
                     </div>
 
                     <span>
-                      সর্বশেষ আপডেট: {new Date(doc.updatedAt || doc.createdAt || '').toLocaleString()}
+                      Last updated: {new Date(doc.updatedAt || doc.createdAt || '').toLocaleString()}
                     </span>
                   </div>
                 </div>

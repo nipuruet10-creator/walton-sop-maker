@@ -2,7 +2,11 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas-pro';
 import { WALTON_LOGO_BASE64 } from '../assets/waltonLogoBase64';
 
-export async function downloadSOPAsPdf(elementId: string = 'sop-paper', processName: string = 'walton_sop') {
+export async function downloadSOPAsPdf(
+  elementId: string = 'sop-paper',
+  processName: string = 'walton_sop',
+  referenceNo?: string
+) {
   const element = document.getElementById(elementId);
   if (!element) {
     alert('SOP document element not found for PDF generation.');
@@ -122,6 +126,27 @@ export async function downloadSOPAsPdf(elementId: string = 'sop-paper', processN
 
   pdf.addImage(imgData, 'JPEG', marginX, marginY, printWidth, printHeight);
 
-  const safeTitle = processName.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'walton_sop';
-  pdf.save(`${safeTitle}.pdf`);
+  const cleanRef = (referenceNo || '')
+    .replace(/[\r\n\t]/g, ' ')
+    .replace(/[/\\:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const cleanProc = (processName || '')
+    .replace(/[\r\n\t]/g, ' ')
+    .replace(/[/\\:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  let fileName = '';
+  if (cleanRef && cleanProc) {
+    fileName = `${cleanRef} - ${cleanProc}`;
+  } else if (cleanRef) {
+    fileName = cleanRef;
+  } else if (cleanProc) {
+    fileName = cleanProc;
+  } else {
+    fileName = 'Walton_SOP';
+  }
+
+  pdf.save(`${fileName}.pdf`);
 }

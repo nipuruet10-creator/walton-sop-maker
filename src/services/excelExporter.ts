@@ -548,9 +548,30 @@ export async function exportSOPToExcel(data: SOPDocument) {
 
   // Generate binary buffer & trigger download via FileSaver
   const buffer = await wb.xlsx.writeBuffer();
-  const safeName = data.header.processName.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'walton_sop';
+  const cleanRef = (data.header.referenceNo || '')
+    .replace(/[\r\n\t]/g, ' ')
+    .replace(/[/\\:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const cleanProc = (data.header.processName || '')
+    .replace(/[\r\n\t]/g, ' ')
+    .replace(/[/\\:*?"<>|]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  let fileName = '';
+  if (cleanRef && cleanProc) {
+    fileName = `${cleanRef} - ${cleanProc}`;
+  } else if (cleanRef) {
+    fileName = cleanRef;
+  } else if (cleanProc) {
+    fileName = cleanProc;
+  } else {
+    fileName = 'Walton_SOP';
+  }
+
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });
-  saveAs(blob, `${safeName}.xlsx`);
+  saveAs(blob, `${fileName}.xlsx`);
 }

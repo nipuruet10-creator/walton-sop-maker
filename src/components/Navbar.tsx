@@ -19,7 +19,10 @@ import {
   ArrowRight,
   FilePlus,
   RotateCcw,
+  CheckCheck,
+  Check,
 } from 'lucide-react';
+import { markNotificationAsRead, markAllNotificationsAsRead } from '../services/storageService';
 
 interface NavbarProps {
   currentUser: UserProfile | null;
@@ -43,6 +46,7 @@ interface NavbarProps {
   isDownloadingPdf?: boolean;
   onNewSop?: () => void;
   onResetSop?: () => void;
+  isSopApproved?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -67,9 +71,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   isDownloadingPdf = false,
   onNewSop,
   onResetSop,
+  isSopApproved = false,
 }) => {
   const [isNotifOpen, setIsNotifOpen] = useState<boolean>(false);
+  const [notifTab, setNotifTab] = useState<'unread' | 'all'>('unread');
+  const [localReadIds, setLocalReadIds] = useState<Set<string>>(new Set());
   const notifRef = useRef<HTMLDivElement>(null);
+
+  // Reset local read overrides when user changes
+  useEffect(() => {
+    setLocalReadIds(new Set());
+  }, [currentUser?.id]);
 
   // Close notifications dropdown on click outside
   useEffect(() => {
@@ -82,7 +94,28 @@ export const Navbar: React.FC<NavbarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const effectiveNotifications = notifications.map((n) =>
+    localReadIds.has(n.id) ? { ...n, isRead: true } : n
+  );
+  const unreadNotifs = effectiveNotifications.filter((n) => !n.isRead);
+  const unreadCount = unreadNotifs.length;
+  const displayedNotifs = notifTab === 'unread' ? unreadNotifs : effectiveNotifications;
+
+  const handleMarkAsRead = (notifId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setLocalReadIds((prev) => new Set([...prev, notifId]));
+    if (currentUser) {
+      markNotificationAsRead(currentUser.id, notifId);
+    }
+  };
+
+  const handleMarkAllRead = () => {
+    if (currentUser && unreadNotifs.length > 0) {
+      const ids = unreadNotifs.map((n) => n.id);
+      setLocalReadIds((prev) => new Set([...prev, ...ids]));
+      markAllNotificationsAsRead(currentUser.id, ids);
+    }
+  };
 
   return (
     <header className="no-print bg-slate-900 text-white border-b border-slate-800 px-3 lg:px-4 h-14 flex items-center justify-between shadow-md sticky top-0 z-40 select-none flex-nowrap overflow-visible">
@@ -113,20 +146,20 @@ export const Navbar: React.FC<NavbarProps> = ({
             type="button"
             onClick={onOpenMasterArchive}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-950/70 hover:bg-indigo-900 text-indigo-200 border border-indigo-700/60 text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95"
-            title="অনুমোদিত ও সংরক্ষিত সমস্ত SOP আর্কাইভ"
+            title="Central Approved & In-Progress SOP Archive"
           >
             <FolderArchive className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span className="hidden md:inline">আর্কাইভ</span>
+            <span className="hidden md:inline">Archive</span>
           </button>
 
           <button
             type="button"
             onClick={onOpenAnalytics}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition cursor-pointer active:scale-95"
-            title="মাসভিত্তিক ও ইউজারভিত্তিক SOP সম্পন্ন রিপোর্ট"
+            title="Monthly Process & Engineer Analytics Dashboard"
           >
             <BarChart3 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            <span className="hidden md:inline">অ্যানালিটিক্স</span>
+            <span className="hidden md:inline">Analytics</span>
           </button>
 
           {currentUser?.role === 'admin' && (
@@ -134,10 +167,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               onClick={onOpenAdminPanel}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900 text-rose-200 border border-rose-800/80 text-xs font-semibold transition cursor-pointer active:scale-95"
-              title="ইউজার ম্যানেজমেন্ট ও সেন্ট্রাল AI কনফিগারেশন"
+              title="User Management & Central AI Configuration"
             >
               <ShieldAlert className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-              <span className="hidden lg:inline">অ্যাডমিন</span>
+              <span className="hidden lg:inline">Admin</span>
             </button>
           )}
         </div>
@@ -150,22 +183,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             type="button"
             onClick={onNewSop}
             className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold shadow-xs transition cursor-pointer active:scale-95"
-            title="নতুন সম্পূর্ণ ব্ল্যাঙ্ক SOP তৈরি করুন"
+            title="Create new clean blank SOP document"
           >
             <FilePlus className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden sm:inline">+ নতুন SOP</span>
+            <span className="hidden sm:inline">+ New SOP</span>
           </button>
         )}
 
-        {onResetSop && (
+        {onResetSop && !isSopApproved && (
           <button
             type="button"
             onClick={onResetSop}
             className="flex items-center gap-1 bg-slate-800 hover:bg-rose-950 text-rose-300 border border-slate-700 hover:border-rose-700 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer"
-            title="বর্তমান SOP রিসেট করে সম্পূর্ণ খালি করুন"
+            title="Reset active SOP to default empty state"
           >
             <RotateCcw className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-            <span className="hidden lg:inline">রিসেট</span>
+            <span className="hidden lg:inline">Reset</span>
           </button>
         )}
 
@@ -173,10 +206,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={onAutoGenerate}
           disabled={isGenerating}
           className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-95"
-          title="Convert Banglish notes into formal industrial Bengali SOP"
+          title="Convert Banglish instructions into formal industrial Bengali procedure"
         >
           <Sparkles className={`w-3.5 h-3.5 shrink-0 ${isGenerating ? 'animate-spin text-amber-300' : 'text-amber-300'}`} />
-          <span className="hidden xl:inline">Banglish → বাংলা AI</span>
+          <span className="hidden xl:inline">AI Assistant</span>
           <span className="xl:hidden hidden sm:inline">AI Generate</span>
         </button>
       </div>
@@ -214,7 +247,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onExportExcel}
             className="flex items-center gap-1 bg-emerald-950/70 hover:bg-emerald-900 text-emerald-200 border border-emerald-700/60 px-2 sm:px-2.5 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer active:scale-95"
-            title="Export SOP data into Microsoft Excel (.xlsx)"
+            title="Export SOP document to Microsoft Excel (.xlsx)"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span className="hidden sm:inline">Excel</span>
@@ -233,7 +266,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onPrint}
             className="p-1.5 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition cursor-pointer"
-            title="Print (Ctrl+P)"
+            title="Print Document (Ctrl+P)"
           >
             <Printer className="w-3.5 h-3.5" />
           </button>
@@ -257,7 +290,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {/* Vertical Divider */}
         <div className="h-4 w-[1px] bg-slate-800" />
 
-        {/* Notification Bell 🔔 (Fixed to Right Edge - Guaranteed No Off-Screen Clipping) */}
+        {/* Notification Bell 🔔 */}
         {currentUser && (
           <div className="relative" ref={notifRef}>
             <button
@@ -268,7 +301,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 hover:bg-amber-500/30'
                   : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
               }`}
-              title={unreadCount > 0 ? `নতুন ${unreadCount}টি পেন্ডিং নোটিফিকেশন আছে!` : 'নোটিফিকেশন সেন্টার'}
+              title={unreadCount > 0 ? `${unreadCount} unread pending task(s)` : 'Notification Center'}
             >
               <div className="relative flex items-center justify-center">
                 <Bell className={`w-4 h-4 ${unreadCount > 0 ? 'text-amber-400 fill-amber-400/20' : 'text-slate-300'}`} />
@@ -279,45 +312,101 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
               <span className="hidden md:inline font-bold">
-                {unreadCount > 0 ? `নোটিফিকেশন (${unreadCount})` : 'নোটিফিকেশন'}
+                {unreadCount > 0 ? `Notifications (${unreadCount})` : 'Notifications'}
               </span>
             </button>
 
             {/* Notification Dropdown Popover */}
             {isNotifOpen && (
               <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 max-w-[calc(100vw-24px)] bg-white text-slate-900 rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-                <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
-                  <div className="flex items-center gap-2 font-bold text-xs">
-                    <div className="w-6 h-6 rounded-md bg-blue-600/30 border border-blue-500/40 flex items-center justify-center">
-                      <Bell className="w-3.5 h-3.5 text-blue-400" />
+                {/* Header with Title & Tab Switcher */}
+                <div className="p-3 bg-slate-900 text-white border-b border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 font-bold text-xs">
+                      <div className="w-6 h-6 rounded-md bg-blue-600/30 border border-blue-500/40 flex items-center justify-center">
+                        <Bell className="w-3.5 h-3.5 text-blue-400" />
+                      </div>
+                      <div>
+                        <span className="block leading-tight font-bold">Notifications & Tasks</span>
+                        <span className="text-[10px] text-slate-400 font-normal">
+                          {notifTab === 'unread' ? 'Active Unread Alerts' : 'All Notifications (History)'}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="block leading-tight">নোটিফিকেশন ও ওয়ার্কফ্লো টাস্ক</span>
-                      <span className="text-[10px] text-slate-400 font-normal">পেন্ডিং রিভিউ ও অনুমোদন রিকোয়েস্ট</span>
-                    </div>
+
+                    {unreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleMarkAllRead}
+                        className="flex items-center gap-1 text-[10.5px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700 transition cursor-pointer"
+                        title="Mark all as read"
+                      >
+                        <CheckCheck className="w-3 h-3" />
+                        <span>Mark All Read</span>
+                      </button>
+                    )}
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-600 text-white font-mono font-bold">
-                    {notifications.length} টি
-                  </span>
+
+                  {/* Tabs: Unread (active) vs View All (bulk & previous) */}
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setNotifTab('unread')}
+                      className={`flex-1 py-1 rounded-md text-[11px] font-bold transition text-center cursor-pointer ${
+                        notifTab === 'unread'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-slate-800/80 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Unread ({unreadCount})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNotifTab('all')}
+                      className={`flex-1 py-1 rounded-md text-[11px] font-bold transition text-center cursor-pointer ${
+                        notifTab === 'all'
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-slate-800/80 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      View All ({notifications.length})
+                    </button>
+                  </div>
                 </div>
 
+                {/* Notifications List */}
                 <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
-                  {notifications.length === 0 ? (
+                  {displayedNotifs.length === 0 ? (
                     <div className="text-center py-10 px-4">
                       <div className="w-10 h-10 rounded-full bg-slate-100 mx-auto flex items-center justify-center text-slate-400 mb-2">
                         <Bell className="w-5 h-5 text-slate-400" />
                       </div>
-                      <p className="text-xs font-bold text-slate-700">কোনো পেন্ডিং নোটিফিকেশন নেই</p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">সবগুলো SOP আপডেট ও অনুমোদন আপ-টু-ডেট রয়েছে।</p>
+                      <p className="text-xs font-bold text-slate-700">
+                        {notifTab === 'unread' ? 'No pending unread notifications' : 'No notification history'}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {notifTab === 'unread' ? (
+                          <button
+                            type="button"
+                            onClick={() => setNotifTab('all')}
+                            className="text-blue-600 hover:underline font-medium"
+                          >
+                            Click here to view previous notifications
+                          </button>
+                        ) : (
+                          'All SOP workflow actions and updates are fully up to date.'
+                        )}
+                      </p>
                     </div>
                   ) : (
-                    notifications.map((notif) => (
+                    displayedNotifs.map((notif) => (
                       <div
                         key={notif.id}
                         className={`p-3 text-xs hover:bg-slate-50 transition cursor-pointer border-l-4 ${
-                          !notif.isRead ? 'border-l-blue-600 bg-blue-50/40' : 'border-l-transparent'
+                          !notif.isRead ? 'border-l-blue-600 bg-blue-50/40' : 'border-l-slate-200 opacity-80'
                         }`}
                         onClick={() => {
+                          handleMarkAsRead(notif.id);
                           if (notif.sopId && onSelectSopById) {
                             onSelectSopById(notif.sopId);
                             setIsNotifOpen(false);
@@ -325,12 +414,29 @@ export const Navbar: React.FC<NavbarProps> = ({
                         }}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <span className="font-bold text-slate-900 leading-tight">
-                            {notif.sopTitle}
-                          </span>
-                          <span className="text-[10px] text-slate-500 shrink-0 font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                            {new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                            {!notif.isRead && (
+                              <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" title="Unread" />
+                            )}
+                            <span className="font-bold text-slate-900 leading-tight truncate">
+                              {notif.sopTitle}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <span className="text-[10px] text-slate-500 font-mono bg-slate-100 px-1.5 py-0.5 rounded">
+                              {new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {!notif.isRead && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleMarkAsRead(notif.id, e)}
+                                className="p-1 hover:bg-blue-100 text-slate-400 hover:text-blue-600 rounded transition"
+                                title="Mark as read"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <p className="text-[11.5px] text-slate-600 mt-1 leading-relaxed">
                           {notif.message}
@@ -340,7 +446,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             {notif.senderName} • {notif.senderRole}
                           </span>
                           <span className="flex items-center gap-1 text-blue-600 font-bold hover:text-blue-700">
-                            পর্যালোচনা ও স্বাক্ষর করুন <ArrowRight className="w-3 h-3" />
+                            Open SOP <ArrowRight className="w-3 h-3" />
                           </span>
                         </div>
                       </div>
@@ -370,7 +476,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               onClick={onOpenWorkspace}
               className="p-1 hover:bg-slate-700 text-blue-300 rounded transition cursor-pointer"
-              title="আমার ওয়ার্কস্পেস"
+              title="My Workspace"
             >
               <FolderArchive className="w-3.5 h-3.5" />
             </button>
@@ -378,7 +484,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               onClick={onLogout}
               className="p-1 hover:bg-slate-700 text-slate-400 hover:text-rose-400 rounded transition cursor-pointer"
-              title="লগআউট"
+              title="Logout"
             >
               <LogOut className="w-3.5 h-3.5" />
             </button>
@@ -390,7 +496,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold shadow-xs transition cursor-pointer"
           >
             <LogIn className="w-3.5 h-3.5" />
-            <span>লগইন</span>
+            <span>Login</span>
           </button>
         )}
       </div>

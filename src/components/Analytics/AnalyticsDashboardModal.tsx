@@ -20,18 +20,18 @@ interface AnalyticsDashboardModalProps {
 }
 
 const MONTH_NAMES = [
-  'জানুয়ারি (Jan)',
-  'ফেব্রুয়ারি (Feb)',
-  'মার্চ (Mar)',
-  'এপ্রিল (Apr)',
-  'মে (May)',
-  'জুন (Jun)',
-  'জুলাই (Jul)',
-  'আগস্ট (Aug)',
-  'সেপ্টেম্বর (Sep)',
-  'অক্টোবর (Oct)',
-  'নভেম্বর (Nov)',
-  'ডিসেম্বর (Dec)',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = ({ isOpen, onClose }) => {
@@ -59,12 +59,12 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
 
   const handleClearTrialData = async () => {
     const ok = window.confirm(
-      'আপনি কি নিশ্চিত যে পূর্বের সব ট্রায়াল ও টেস্ট ডাটা মুছে অ্যানালিটিক্স সম্পূর্ণ ফ্রেশ ও শূন্য করতে চান?'
+      'Are you sure you want to clear all test and trial records to reset analytics?'
     );
     if (!ok) return;
     await clearTrialData();
     await loadData();
-    alert('ট্রায়াল ডাটা সফলভাবে মুছে ফেলা হয়েছে!');
+    alert('Trial data successfully cleared!');
   };
 
   if (!isOpen) return null;
@@ -155,7 +155,7 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
                 </span>
               </div>
               <p className="text-xs text-blue-200">
-                ইউজারভিত্তিক ও মাসভিত্তিক সম্পূর্ণ হওয়া SOP-এর অগ্রগতি ড্যাশবোর্ড
+                User-wise and monthly completed SOP productivity dashboard
               </p>
             </div>
           </div>
@@ -165,10 +165,10 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
               type="button"
               onClick={handleClearTrialData}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-700/60 text-xs font-bold transition cursor-pointer"
-              title="পূর্বের সব টেস্ট ও ট্রায়াল ডাটা মুছে অ্যানালিটিক্স ক্লিয়ার করুন"
+              title="Clear test and trial records to reset analytics"
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-              <span className="hidden sm:inline">ট্রায়াল ডাটা মুছুন</span>
+              <span className="hidden sm:inline">Clear Trial Data</span>
             </button>
 
             <select
@@ -197,7 +197,7 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
         <div className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-6">
           {loading ? (
             <div className="text-center py-20 text-slate-500 text-xs font-semibold">
-              অ্যানালিটিক্স ডাটা লোড হচ্ছে...
+              Loading analytics data...
             </div>
           ) : (
             <>
@@ -208,9 +208,9 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
                     <CheckCircle2 className="w-6 h-6" />
                   </div>
                   <div>
-                    <span className="text-[11px] font-semibold text-slate-500 block">অনুমোদিত ও সম্পন্ন (Complete)</span>
+                    <span className="text-[11px] font-semibold text-slate-500 block">Approved & Completed</span>
                     <span className="text-2xl font-bold text-slate-900">{approvedSops.length}</span>
-                    <span className="text-[10px] text-emerald-600 block font-medium">আর্কাইভে সংরক্ষিত ও লাইভ</span>
+                    <span className="text-[10px] text-emerald-600 block font-medium">Published in Master Archive</span>
                   </div>
                 </div>
 
@@ -219,9 +219,9 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
                 <Clock className="w-6 h-6" />
               </div>
               <div>
-                <span className="text-[11px] font-semibold text-slate-500 block">চলমান / পর্যালোচনায় (In-Progress)</span>
+                <span className="text-[11px] font-semibold text-slate-500 block">In-Progress / Under Review</span>
                 <span className="text-2xl font-bold text-slate-900">{inProgressSops.length}</span>
-                <span className="text-[10px] text-blue-600 block font-medium">Checker বা Approver-এ</span>
+                <span className="text-[10px] text-blue-600 block font-medium">With Checker or Approver</span>
               </div>
             </div>
 
@@ -230,9 +230,9 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
                 <FileText className="w-6 h-6" />
               </div>
               <div>
-                <span className="text-[11px] font-semibold text-slate-500 block">খসড়া (Drafts)</span>
+                <span className="text-[11px] font-semibold text-slate-500 block">Drafts (In-Progress)</span>
                 <span className="text-2xl font-bold text-slate-900">{draftSops.length}</span>
-                <span className="text-[10px] text-amber-600 block font-medium">ইঞ্জিনিয়ারের ওয়ার্কস্পেসে</span>
+                <span className="text-[10px] text-amber-600 block font-medium">In Author Workspaces</span>
               </div>
             </div>
 
@@ -241,24 +241,24 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
                 <Users className="w-6 h-6" />
               </div>
               <div>
-                <span className="text-[11px] font-semibold text-slate-500 block">সক্রিয় কন্ট্রিবিউটর</span>
-                <span className="text-2xl font-bold text-slate-900">{userLeaderboard.length} জন</span>
-                <span className="text-[10px] text-purple-600 block font-medium">Biplob, Dev, ও দল</span>
+                <span className="text-[11px] font-semibold text-slate-500 block">Active Contributors</span>
+                <span className="text-2xl font-bold text-slate-900">{userLeaderboard.length} Contributors</span>
+                <span className="text-[10px] text-purple-600 block font-medium">Engineering & Process Team</span>
               </div>
             </div>
           </div>
 
-          {/* Userwise Breakdown (কার নামে কয়টি complete SOP আছে) */}
+          {/* Userwise Breakdown */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">
                 <Award className="w-5 h-5 text-amber-500" />
                 <h3 className="font-bold text-slate-900 text-sm">
-                  ইউজারভিত্তিক সম্পন্ন হওয়া SOP তালিকা (Userwise Completion)
+                  User-wise SOP Completion Breakdown
                 </h3>
               </div>
               <span className="text-xs text-slate-500">
-                Biplob, Dev এবং সংশ্লিষ্ট টিমের কৃতিত্ব
+                Individual and team process output achievements
               </span>
             </div>
 
@@ -266,19 +266,19 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
               <table className="w-full text-xs text-left">
                 <thead>
                   <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
-                    <th className="py-2.5 px-3">ক্রমিক</th>
-                    <th className="py-2.5 px-3">কন্ট্রিবিউটর / প্রসেস ইঞ্জিনিয়ার</th>
-                    <th className="py-2.5 px-3 text-center">সম্পূর্ণ SOP (Approved)</th>
-                    <th className="py-2.5 px-3 text-center">চলমান (In-Progress)</th>
-                    <th className="py-2.5 px-3 text-center">মোট SOP</th>
-                    <th className="py-2.5 px-3 text-right">সম্পূর্ণতার হার</th>
+                    <th className="py-2.5 px-3">#</th>
+                    <th className="py-2.5 px-3">Contributor / Process Engineer</th>
+                    <th className="py-2.5 px-3 text-center">Approved SOPs</th>
+                    <th className="py-2.5 px-3 text-center">In-Progress</th>
+                    <th className="py-2.5 px-3 text-center">Total SOPs</th>
+                    <th className="py-2.5 px-3 text-right">Completion Rate</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {userLeaderboard.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="text-center py-6 text-slate-400">
-                        কোনো ডাটা রেকর্ড পাওয়া যায়নি
+                        No data records found
                       </td>
                     </tr>
                   ) : (
@@ -295,16 +295,16 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
                           </td>
                           <td className="py-2.5 px-3 text-center">
                             <span className="inline-block px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">
-                              {item.completed} টি
+                              {item.completed}
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-center">
                             <span className="inline-block px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold">
-                              {item.inProgress} টি
+                              {item.inProgress}
                             </span>
                           </td>
                           <td className="py-2.5 px-3 text-center font-bold text-slate-700">
-                            {item.total} টি
+                            {item.total}
                           </td>
                           <td className="py-2.5 px-3 text-right">
                             <div className="flex items-center justify-end gap-2">
@@ -332,11 +332,11 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-blue-600" />
                 <h3 className="font-bold text-slate-900 text-sm">
-                  মাসভিত্তিক SOP সম্পন্নতার গতিবিধি (Monthwise Completions - {selectedYear})
+                  Monthly SOP Completion Velocity ({selectedYear})
                 </h3>
               </div>
               <span className="text-xs font-bold text-blue-600">
-                এই বছরের মোট সম্পন্ন: {monthCounts.reduce((a, b) => a + b, 0)} টি
+                Total Completed This Year: {monthCounts.reduce((a, b) => a + b, 0)}
               </span>
             </div>
 
@@ -367,8 +367,8 @@ export const AnalyticsDashboardModal: React.FC<AnalyticsDashboardModalProps> = (
             </div>
 
             <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-              <span>* প্রতিটি বারে মাউস নিলে সংশ্লিষ্ট মাসে সম্পন্ন হওয়া SOP-এর সঠিক সংখ্যা দেখতে পাবেন।</span>
-              <span>বছর: {selectedYear}</span>
+              <span>* Hover over bars to view monthly completion counts.</span>
+              <span>Year: {selectedYear}</span>
             </div>
           </div>
           </>

@@ -35,6 +35,7 @@ import {
   getUserWorkingDraft,
   saveUserWorkingDraft,
   createDefaultSopForUser,
+  pullAllSopsFromCloud,
 } from './services/storageService';
 import { exportSOPToExcel } from './services/excelExporter';
 import { downloadSOPAsPdf } from './services/pdfExporter';
@@ -155,16 +156,128 @@ export const App: React.FC = () => {
     refreshNotifications();
   }, [data.status, data.updatedAt]);
 
+  // Continuous background cloud sync for cross-PC collaboration (every 4 seconds)
+  useEffect(() => {
+    let isCancelled = false;
+
+    const runBackgroundSync = async () => {
+      if (document.hidden) return;
+      try {
+        const cloudSops = await pullAllSopsFromCloud();
+        if (isCancelled || !cloudSops || cloudSops.length === 0) return;
+
+        // Check if our active document has been approved or updated on another PC
+        setData((prev) => {
+          if (!prev) return prev;
+          const match = cloudSops.find(
+            (s) =>
+              (prev.id && s.id === prev.id) ||
+              (s.header?.processName &&
+                prev.header?.processName &&
+                s.header.processName.trim().toLowerCase() === prev.header.processName.trim().toLowerCase())
+          );
+
+          if (match) {
+            const cloudTime = new Date(match.updatedAt || 0).getTime();
+            const localTime = new Date(prev.updatedAt || 0).getTime();
+
+            if (match.status === 'approved' && prev.status !== 'approved') {
+              if (currentUser) {
+                localStorage.setItem(`walton_sop_user_draft_v2_${currentUser.id}`, JSON.stringify(match));
+              }
+              return match;
+            }
+            if (cloudTime > localTime && match.status !== prev.status) {
+              if (currentUser) {
+                localStorage.setItem(`walton_sop_user_draft_v2_${currentUser.id}`, JSON.stringify(match));
+              }
+              return match;
+            }
+          }
+          return prev;
+        });
+
+        refreshNotifications();
+      } catch {}
+    };
+
+    const interval = setInterval(runBackgroundSync, 4000);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [currentUser?.id]);
+
+  // Real-time synchronization listener across tabs/sessions
+  useEffect(() => {
+    const handleSopUpdate = (e: any) => {
+      const updated: SOPDocument = e.detail;
+      if (!updated) return;
+
+      // If the current document matches or belongs to this user, update it immediately!
+      setData((prev) => {
+        if (prev.id === updated.id) {
+          return updated;
+        }
+        if (
+          !prev.id &&
+          updated.header?.processName &&
+          prev.header?.processName &&
+          updated.header.processName.toLowerCase().trim() === prev.header.processName.toLowerCase().trim()
+        ) {
+          return updated;
+        }
+        if (
+          currentUser &&
+          (updated.authorId === currentUser.id ||
+            updated.header?.preparedBy?.name?.includes(currentUser.username) ||
+            (currentUser.employeeId && updated.header?.preparedBy?.name?.includes(currentUser.employeeId)))
+        ) {
+          if (
+            prev.header?.processName === updated.header?.processName ||
+            prev.header?.referenceNo === updated.header?.referenceNo
+          ) {
+            return updated;
+          }
+        }
+        return prev;
+      });
+
+      refreshNotifications();
+    };
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'walton_sop_last_updated' || e.key?.startsWith('walton_sop_user_draft_v2_')) {
+        refreshNotifications();
+        if (currentUser) {
+          getUserWorkingDraft(currentUser.id).then((draft) => {
+            if (draft && draft.id) {
+              setData((prev) => (prev.id === draft.id ? draft : prev));
+            }
+          });
+        }
+      }
+    };
+
+    window.addEventListener('walton_sop_updated', handleSopUpdate as EventListener);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('walton_sop_updated', handleSopUpdate as EventListener);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [currentUser]);
+
   const handleSelectSopById = async (sopId: string) => {
     try {
       const targetDoc = await getSOPById(sopId);
       if (targetDoc) {
         setData(targetDoc);
       } else {
-        alert('SOP টি পাওয়া যায়নি।');
+        alert('SOP document not found.');
       }
     } catch (e: any) {
-      alert('SOP লোড করতে সমস্যা হয়েছে: ' + e.message);
+      alert('Failed to load SOP: ' + e.message);
     }
   };
 
@@ -233,7 +346,7 @@ export const App: React.FC = () => {
   const handleDownloadPdf = async () => {
     setIsDownloadingPdf(true);
     try {
-      await downloadSOPAsPdf('sop-paper', data.header.processName);
+      await downloadSOPAsPdf('sop-paper', data.header.processName, data.header.referenceNo);
     } catch (err: any) {
       alert('PDF generation error: ' + (err.message || 'Unknown error'));
     } finally {
@@ -245,9 +358,29 @@ export const App: React.FC = () => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url;
-    const safeName = data.header.processName.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'walton_sop';
-    link.download = `${safeName}_backup.json`;
+    const cleanRef = (data.header.referenceNo || '')
+      .replace(/[\r\n\t]/g, ' ')
+      .replace(/[/\\:*?"<>|]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const cleanProc = (data.header.processName || '')
+      .replace(/[\r\n\t]/g, ' ')
+      .replace(/[/\\:*?"<>|]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    let fileName = '';
+    if (cleanRef && cleanProc) {
+      fileName = `${cleanRef} - ${cleanProc}`;
+    } else if (cleanRef) {
+      fileName = cleanRef;
+    } else if (cleanProc) {
+      fileName = cleanProc;
+    } else {
+      fileName = 'Walton_SOP';
+    }
+
+    link.download = `${fileName}_backup.json`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -283,7 +416,7 @@ export const App: React.FC = () => {
 
     if (hasContent) {
       const confirmNew = window.confirm(
-        'আপনি কি নতুন ব্ল্যাঙ্ক SOP তৈরি করতে চান? বর্তমান অসংরক্ষিত ফিল্ড ও ছবি ক্লিয়ার হবে।'
+        'Are you sure you want to create a new blank SOP? Current unsaved inputs will be cleared.'
       );
       if (!confirmNew) return;
     }
@@ -299,8 +432,12 @@ export const App: React.FC = () => {
   };
 
   const handleResetSop = () => {
+    if (data.status === 'approved') {
+      alert('This SOP has been officially approved and locked. Form reset is disabled.');
+      return;
+    }
     const confirmReset = window.confirm(
-      'আপনি কি বর্তমান SOP-এর সব টেক্সট, ছবি ও ধাপ রিসেট করে সম্পূর্ণ খালি (Reset) করতে চান?'
+      'Are you sure you want to clear and reset all fields, photos, and procedure steps of the current SOP?'
     );
     if (!confirmReset) return;
 
@@ -469,6 +606,7 @@ export const App: React.FC = () => {
         isDownloadingPdf={isDownloadingPdf}
         onNewSop={handleNewSop}
         onResetSop={handleResetSop}
+        isSopApproved={data.status === 'approved'}
       />
 
       {/* Workflow & Approval Status Action Bar */}
@@ -500,20 +638,22 @@ export const App: React.FC = () => {
                     SOP Parameter Editor
                   </h2>
                   <p className="text-[10px] text-slate-400">
-                    ছবি আপলোড, বাংলিশ প্রসিডিউর, হেডার ও টেবিল
+                    {data.status === 'approved' ? 'Officially Approved & Locked' : 'Images, Banglish procedure, header & tables'}
                   </p>
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={handleResetSop}
-                    className="flex items-center gap-1 bg-rose-900/80 hover:bg-rose-800 text-rose-200 text-[11px] font-bold px-2 py-1 rounded transition cursor-pointer border border-rose-700/60"
-                    title="বর্তমান ফর্মের সব তথ্য রিসেট / খালি করুন"
-                  >
-                    <RotateCcw className="w-3 h-3 text-rose-300" />
-                    <span>রিসেট</span>
-                  </button>
+                  {data.status !== 'approved' && (
+                    <button
+                      type="button"
+                      onClick={handleResetSop}
+                      className="flex items-center gap-1 bg-rose-900/80 hover:bg-rose-800 text-rose-200 text-[11px] font-bold px-2 py-1 rounded transition cursor-pointer border border-rose-700/60"
+                      title="Reset all form inputs"
+                    >
+                      <RotateCcw className="w-3 h-3 text-rose-300" />
+                      <span>Reset</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleExportExcel}
@@ -533,6 +673,19 @@ export const App: React.FC = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Approved Document Lock Banner */}
+              {data.status === 'approved' && (
+                <div className="bg-emerald-50 border-b border-emerald-200 p-2.5 flex items-center gap-2 text-xs text-emerald-950">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <div className="leading-tight">
+                    <strong className="block text-emerald-900">Document Officially Approved</strong>
+                    <span className="text-[10.5px] text-emerald-700">
+                      Editing is locked to ensure compliance. Only official PDF download is enabled.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Tabs Header */}
               <div className="bg-slate-100 border-b border-slate-200 p-1.5 flex items-center justify-between gap-1 shrink-0 overflow-x-auto">
@@ -602,8 +755,8 @@ export const App: React.FC = () => {
                 </button>
               </div>
 
-              {/* Tab Content Panel (Scrollable) */}
-              <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
+              {/* Tab Content Panel (Scrollable, locked if approved) */}
+              <div className={`flex-1 overflow-y-auto p-4 bg-slate-50 ${data.status === 'approved' ? 'pointer-events-none opacity-80' : ''}`}>
                 {activeTab === 'photos' && (
                   <ImageManager
                     photos={data.photos}
@@ -630,7 +783,7 @@ export const App: React.FC = () => {
                       if (currentUser?.role === 'admin') {
                         setIsAdminModalOpen(true);
                       } else {
-                        alert('সেন্ট্রাল AI ইঞ্জিন কনফিগারেশন অ্যাডমিন প্যানেল থেকে নিয়ন্ত্রিত হয়।');
+                        alert('Central AI engine configuration is managed in the Admin Panel.');
                       }
                     }}
                     stepFontSize={data.stepFontSize || 'auto'}
@@ -688,15 +841,15 @@ export const App: React.FC = () => {
             <div className="flex items-center gap-1.5">
               <span className="flex items-center gap-1 font-semibold text-slate-700">
                 <Type className="w-3.5 h-3.5 text-blue-600" />
-                <span>কার্যপ্রণালী সাইজ:</span>
+                <span>Procedure Font:</span>
               </span>
               <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                 {(
                   [
                     { id: 'auto', label: 'Auto' },
-                    { id: 'compact', label: 'ছোট' },
-                    { id: 'normal', label: 'স্বাভাবিক' },
-                    { id: 'large', label: 'বড়' },
+                    { id: 'compact', label: 'Compact' },
+                    { id: 'normal', label: 'Normal' },
+                    { id: 'large', label: 'Large' },
                     { id: 'xlarge', label: 'XL' },
                   ] as const
                 ).map((opt) => (
@@ -722,15 +875,15 @@ export const App: React.FC = () => {
             <div className="flex items-center gap-1.5">
               <span className="flex items-center gap-1 font-semibold text-amber-800">
                 <Sparkles className="w-3 h-3 text-amber-500" />
-                <span>লক্ষণীয় বিষয় সাইজ:</span>
+                <span>Key Points Font:</span>
               </span>
               <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                 {(
                   [
                     { id: 'auto', label: 'Auto' },
-                    { id: 'compact', label: 'ছোট' },
-                    { id: 'normal', label: 'স্বাভাবিক' },
-                    { id: 'large', label: 'বড়' },
+                    { id: 'compact', label: 'Compact' },
+                    { id: 'normal', label: 'Normal' },
+                    { id: 'large', label: 'Large' },
                   ] as const
                 ).map((opt) => (
                   <button
@@ -755,14 +908,14 @@ export const App: React.FC = () => {
             <div className="flex items-center gap-1.5">
               <span className="flex items-center gap-1 font-semibold text-slate-700">
                 <LayoutGrid className="w-3.5 h-3.5 text-blue-600" />
-                <span>গ্রিড:</span>
+                <span>Columns:</span>
               </span>
               <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                 {(
                   [
                     { id: 0, label: 'Auto' },
-                    { id: 2, label: '২ কলাম' },
-                    { id: 3, label: '৩ কলাম' },
+                    { id: 2, label: '2 Columns' },
+                    { id: 3, label: '3 Columns' },
                   ] as const
                 ).map((opt) => (
                   <button
@@ -785,7 +938,7 @@ export const App: React.FC = () => {
 
             {/* Image Fit */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-semibold text-slate-700">ছবি ফিট:</span>
+              <span className="text-[11px] font-semibold text-slate-700">Image Fit:</span>
               <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
                 {(
                   [

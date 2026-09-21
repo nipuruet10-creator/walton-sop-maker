@@ -9,11 +9,11 @@ interface SafetyEditorProps {
 
 export const SafetyEditor: React.FC<SafetyEditorProps> = ({ safety, onChange }) => {
   const ppeOptions = [
-    { key: 'earMuff', label: 'Ear Muff (শব্দ প্রতিরোধক)', icon: '/ppe/ear-muff.svg' },
-    { key: 'gloves', label: 'Hand Gloves (হাত মোজা)', icon: '/ppe/gloves.svg' },
-    { key: 'goggles', label: 'Safety Goggles (চশমা)', icon: '/ppe/goggles.svg' },
-    { key: 'safetyShoes', label: 'Safety Shoes (নিরাপত্তা জুতা)', icon: '/ppe/safety-shoes.svg' },
-    { key: 'mask', label: 'Mask (মাস্ক)', icon: '/ppe/mask.svg' },
+    { key: 'earMuff', label: 'Ear Muff', icon: '/ppe/ear-muff.svg' },
+    { key: 'gloves', label: 'Hand Gloves', icon: '/ppe/gloves.svg' },
+    { key: 'goggles', label: 'Safety Goggles', icon: '/ppe/goggles.svg' },
+    { key: 'safetyShoes', label: 'Safety Shoes', icon: '/ppe/safety-shoes.svg' },
+    { key: 'mask', label: 'Safety Mask', icon: '/ppe/mask.svg' },
   ] as const;
 
   const togglePpe = (key: keyof Pick<SOPSafety, 'earMuff' | 'gloves' | 'goggles' | 'safetyShoes' | 'mask'>) => {
@@ -33,7 +33,7 @@ export const SafetyEditor: React.FC<SafetyEditorProps> = ({ safety, onChange }) 
 
         <div>
           <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-            Safety Directive Statement (বাংলা)
+            Safety Directive Statement (Bengali)
           </label>
           <textarea
             value={safety.instructionText}

@@ -173,7 +173,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                   OpenRouter allows you to use top AI models like <strong>Gemma, Llama 3.3, DeepSeek, Qwen</strong> completely free. Your API key stays private in your browser’s local storage.
                 </p>
                 <p className="text-[11px] text-emerald-800 bg-emerald-50/80 p-1.5 rounded-lg border border-emerald-200/60 font-medium">
-                  💡 <strong>টিপস:</strong> কোনো API Key ছাড়াও আমাদের বিল্ট-ইন বাংলা ইঞ্জিন ১০০% শুদ্ধ বাংলায় রূপান্তর করতে পারে। অতিরিক্ত AI শক্তি চাইলে একটি ফ্রি কী যুক্ত করতে পারেন।
+                  💡 <strong>Tip:</strong> The built-in offline engine produces 100% formal Walton factory Bengali procedures without any API key. Add a free API key for enhanced AI capabilities.
                 </p>
               </div>
 
@@ -215,7 +215,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                 {/* Key Test Action & Feedback */}
                 <div className="flex items-center justify-between mt-1.5">
                   <span className="text-[10.5px] text-slate-500">
-                    {orKey.trim() ? 'কী চেক করে দেখতে পারেন:' : 'কী থাকলে কানেকশন টেস্ট করুন:'}
+                    {orKey.trim() ? 'Test your API key:' : 'Verify API connection:'}
                   </span>
                   <button
                     type="button"
@@ -224,7 +224,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                     className="text-[10.5px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-2.5 py-0.8 rounded-md font-medium cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
                   >
                     <RefreshCw className={`w-2.5 h-2.5 ${isTestingKey ? 'animate-spin' : ''}`} />
-                    <span>{isTestingKey ? 'চেক হচ্ছে...' : 'টেস্ট কী (Test Key)'}</span>
+                    <span>{isTestingKey ? 'Testing...' : 'Test Key'}</span>
                   </button>
                 </div>
 

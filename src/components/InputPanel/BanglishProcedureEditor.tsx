@@ -77,7 +77,7 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
   const handleAddStep = () => {
     const newIdx = procedure.steps.length + 1;
     const prefix = `${toBengaliNumber(newIdx)}) `;
-    onChange({ ...procedure, steps: [...procedure.steps, `${prefix}নুতন কাজের ধাপ লিখুন...`] });
+    onChange({ ...procedure, steps: [...procedure.steps, `${prefix}নতুন কাজের ধাপ লিখুন...`] });
   };
 
   const handleDeleteStep = (index: number) => {
@@ -141,7 +141,7 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
                     ? 'bg-blue-900/60 text-blue-300 border border-blue-700/60 hover:bg-blue-800/60'
                     : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
                 }`}
-                title="Click to configure AI Model / OpenRouter API"
+                title="Configure AI Model / OpenRouter API"
               >
                 <Cpu className="w-2.5 h-2.5 text-blue-400" />
                 <span>
@@ -149,12 +149,12 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
                     ? activeProvider === 'openrouter'
                       ? `AI: ${activeModel.replace(':free', '').split('/').pop()}`
                       : 'Gemini AI'
-                    : 'সেন্ট্রাল AI সেটিংস'}
+                    : 'Central AI Config'}
                 </span>
               </button>
             ) : (
               <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
-                {hasApiKey ? 'AI Ready' : 'বাংলা ইঞ্জিন'}
+                {hasApiKey ? 'AI Ready' : 'Offline Engine'}
               </span>
             )}
 
@@ -167,7 +167,7 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
                   ? 'bg-emerald-700 text-white shadow-xs'
                   : 'bg-slate-800 text-slate-400 hover:text-white'
               }`}
-              title="বাংলিশ লেখার সাথে সাথে নিচে স্বয়ংক্রিয়ভাবে বাংলায় অনুবাদ হবে"
+              title="Automatically translate Banglish to Bengali as you type"
             >
               <Zap className={`w-3 h-3 ${autoConvert ? 'text-amber-300' : ''}`} />
               <span>{autoConvert ? 'Auto-Translate ON' : 'Auto-Translate OFF'}</span>
@@ -179,17 +179,17 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
           value={procedure.banglishInput}
           onChange={(e) => handleBanglishChange(e.target.value)}
           rows={6}
-          placeholder="এখানে বাংলিশ বা ইংরেজিতে ধাপগুলো লিখুন... যেমন:
+          placeholder={`Enter Banglish or English procedure notes here... e.g.:
 1) packaging tape dispenser theke 200 mm bopp tape kete nite hobe.
 2) cartoon er marked sthane tepti boshate hobe (chobi 1).
-3) indoor cartoon er every ta taping jaygay ek layer BOPP tape use korte hobe (chobi 2)..."
+3) indoor cartoon er every ta taping jaygay ek layer BOPP tape use korte hobe (chobi 2)...`}
           className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 placeholder:text-slate-500 font-mono focus:outline-none focus:border-blue-500 resize-y leading-relaxed"
         />
 
         <div className="flex items-center justify-between gap-2 pt-1">
           <div className="flex items-center gap-1 text-[11px] text-slate-400">
             <HelpCircle className="w-3 h-3 text-slate-400 shrink-0" />
-            <span>'chobi 1', 'chobi-2 onujayi' লিখলে ছবির সাথে লিংক হবে</span>
+            <span>Mention 'chobi 1', 'chobi 2' to auto-link with photo labels</span>
           </div>
 
           <button
@@ -199,7 +199,7 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
             className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:from-slate-700 disabled:to-slate-700 text-white px-3.5 py-1.5 rounded-lg font-bold transition cursor-pointer disabled:cursor-not-allowed shadow-md text-xs shrink-0"
           >
             <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin text-amber-300' : 'text-amber-300'}`} />
-            <span>{isGenerating ? 'AI অনুবাদ ও পরিমার্জন হচ্ছে...' : 'AI Generate (100% Bengali)'}</span>
+            <span>{isGenerating ? 'AI Translating...' : 'AI Generate (Bengali SOP)'}</span>
           </button>
         </div>
       </div>
@@ -208,15 +208,15 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
       <div className="bg-slate-100/90 p-2 rounded-lg border border-slate-200 flex flex-wrap items-center justify-between gap-2 shadow-xs">
         <div className="flex items-center gap-1.5 text-xs text-slate-700 font-semibold">
           <Type className="w-3.5 h-3.5 text-blue-600" />
-          <span>টেক্সট ফন্ট সাইজ (Font Size):</span>
+          <span>Step Font Size:</span>
         </div>
         <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-slate-200 text-[11px]">
           {(
             [
-              { key: 'auto', label: 'Auto (স্বয়ংক্রিয়)' },
-              { key: 'compact', label: 'ছোট' },
-              { key: 'normal', label: 'স্বাভাবিক' },
-              { key: 'large', label: 'বড়' },
+              { key: 'auto', label: 'Auto' },
+              { key: 'compact', label: 'Compact' },
+              { key: 'normal', label: 'Normal' },
+              { key: 'large', label: 'Large' },
             ] as const
           ).map((opt) => (
             <button
@@ -228,7 +228,7 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
                   ? 'bg-blue-600 text-white font-bold shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
-              title={`SOP পেপারের টেক্সট সাইজ ${opt.label} করুন`}
+              title={`Set procedure step font size to ${opt.label}`}
             >
               {opt.label}
             </button>
@@ -241,7 +241,7 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
         <div className="flex items-center justify-between border-b pb-1">
           <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>কার্যপ্রণালী (Procedure Steps)</span>
+            <span>Procedure Steps</span>
           </h3>
           <button
             type="button"
@@ -277,12 +277,12 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
         </div>
       </div>
 
-      {/* লক্ষণীয় বিষয় (Quality Points) */}
+      {/* Critical Quality Points */}
       <div className="space-y-2.5 pt-2 border-t border-slate-200">
         <div className="flex items-center justify-between border-b pb-1 gap-2 flex-wrap">
           <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>লক্ষণীয় বিষয় (Critical Quality Points)</span>
+            <span>Critical Quality Points</span>
           </h3>
 
           <div className="flex items-center gap-2">
@@ -290,14 +290,14 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
             <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[10px]">
               <span className="flex items-center gap-0.5 px-1 font-semibold text-slate-500">
                 <Type className="w-3 h-3 text-amber-600" />
-                <span>সাইজ:</span>
+                <span>Size:</span>
               </span>
               {(
                 [
                   { id: 'auto', label: 'Auto' },
-                  { id: 'compact', label: 'ছোট' },
-                  { id: 'normal', label: 'স্বাভাবিক' },
-                  { id: 'large', label: 'বড়' },
+                  { id: 'compact', label: 'Compact' },
+                  { id: 'normal', label: 'Normal' },
+                  { id: 'large', label: 'Large' },
                 ] as const
               ).map((opt) => (
                 <button
@@ -330,7 +330,7 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
           <div className="flex items-center justify-between">
             <label className="font-bold text-amber-300 flex items-center gap-1.5 text-xs">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Banglish Input (লক্ষণীয় বিষয় AI Generator)</span>
+              <span>Banglish Input (Quality Points AI Generator)</span>
             </label>
           </div>
 
@@ -338,15 +338,15 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
             value={procedure.qualityBanglishInput || ''}
             onChange={(e) => onChange({ ...procedure, qualityBanglishInput: e.target.value })}
             rows={3}
-            placeholder="এখানে লক্ষণীয় বিষয় বা চেকিং পয়েন্ট বাংলিশ/ইংরেজিতে লিখুন... যেমন:
+            placeholder={`Enter Banglish or English notes for critical quality points... e.g.:
 1) belt laganor somoy nissit korte hobe jate cartoon chire na jay (chobi-6).
-2) tape boshonor somoy kheyal rakhte hobe jate tape baka na hoy ebong sojasuji thake..."
+2) tape boshonor somoy kheyal rakhte hobe jate tape baka na hoy ebong sojasuji thake...`}
             className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 placeholder:text-slate-500 font-mono focus:outline-none focus:border-amber-500 resize-y leading-relaxed"
           />
 
           <div className="flex items-center justify-between gap-2 pt-0.5">
             <span className="text-[11px] text-slate-400">
-              {hasApiKey ? 'OpenRouter AI দিয়ে সম্পূর্ণ বাংলায় অনুবাদ হবে' : 'অফলাইন ইঞ্জিন দিয়ে বাংলায় রূপান্তর হবে'}
+              {hasApiKey ? 'Translates via AI into professional Bengali' : 'Translates via offline Bengali rule engine'}
             </span>
 
             <button
@@ -356,7 +356,7 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
               className="flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 disabled:from-slate-700 disabled:to-slate-700 text-white px-3 py-1.5 rounded-lg font-bold transition cursor-pointer disabled:cursor-not-allowed shadow-md text-xs shrink-0"
             >
               <Sparkles className={`w-3.5 h-3.5 ${isGeneratingQuality ? 'animate-spin text-yellow-200' : 'text-yellow-200'}`} />
-              <span>{isGeneratingQuality ? 'AI অনুবাদ হচ্ছে...' : 'AI Generate Quality Points'}</span>
+              <span>{isGeneratingQuality ? 'Generating...' : 'AI Generate Quality Points'}</span>
             </button>
           </div>
         </div>
@@ -385,11 +385,11 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
         </div>
       </div>
 
-      {/* সাধারণ নির্দেশনা (General Instructions) */}
+      {/* General Instructions */}
       <div className="space-y-2 pt-2 border-t border-slate-200">
         <div className="flex items-center justify-between border-b pb-1">
           <h3 className="font-bold text-slate-800 text-xs">
-            সাধারণ নির্দেশনা (General Instructions)
+            General Instructions
           </h3>
           <button
             type="button"

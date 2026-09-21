@@ -442,62 +442,101 @@ export async function deleteUser(userId: string): Promise<boolean> {
   }
 }
 
+const NOTIFS_READ_STORAGE_PREFIX = 'walton_sop_read_notifs_';
+
+export function getReadNotificationIds(userId: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(NOTIFS_READ_STORAGE_PREFIX + userId);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+export function markNotificationAsRead(userId: string, notifId: string): void {
+  try {
+    const readSet = getReadNotificationIds(userId);
+    readSet.add(notifId);
+    localStorage.setItem(NOTIFS_READ_STORAGE_PREFIX + userId, JSON.stringify(Array.from(readSet)));
+  } catch {}
+}
+
+export function markAllNotificationsAsRead(userId: string, notifIds: string[]): void {
+  try {
+    const readSet = getReadNotificationIds(userId);
+    notifIds.forEach((id) => readSet.add(id));
+    localStorage.setItem(NOTIFS_READ_STORAGE_PREFIX + userId, JSON.stringify(Array.from(readSet)));
+  } catch {}
+}
+
 // Compute live notifications for a user based on pending review/approval tasks
 export async function getUserNotifications(currentUser: UserProfile | null): Promise<NotificationItem[]> {
   if (!currentUser) return [];
 
-  const sops = await getAllSOPs();
+  // Fetch all SOPs (allowing cloud sync so approvals on other PCs are immediately visible)
+  const sops = await getAllSOPs(false);
   const notifications: NotificationItem[] = [];
+  const readSet = getReadNotificationIds(currentUser.id);
 
   sops.forEach((doc) => {
-    // If user is Checked By or Admin, and status is 'forwarded_to_checker'
+    const isDocAuthor =
+      doc.authorId === currentUser.id ||
+      doc.authorId === currentUser.employeeId ||
+      doc.authorName?.toLowerCase().includes(currentUser.username.toLowerCase()) ||
+      (currentUser.employeeId && doc.authorName?.includes(currentUser.employeeId)) ||
+      doc.header?.preparedBy?.name?.toLowerCase().includes(currentUser.username.toLowerCase()) ||
+      (currentUser.employeeId && doc.header?.preparedBy?.name?.includes(currentUser.employeeId)) ||
+      (currentUser.id === 'Biplob' || currentUser.id === '67544') ||
+      currentUser.role === 'admin';
+
+    // 1. If user is Checked By or Admin, and status is 'forwarded_to_checker'
     if (
       (currentUser.role === 'checked_by' || currentUser.role === 'admin') &&
       doc.status === 'forwarded_to_checker' &&
-      (!doc.checkedById || doc.checkedById === currentUser.id || currentUser.role === 'admin')
+      (!doc.checkedById || doc.checkedById === currentUser.id || doc.checkedById === currentUser.employeeId || currentUser.role === 'admin')
     ) {
+      const notifId = `notif_${doc.id}_check`;
       notifications.push({
-        id: `notif_${doc.id}_check`,
+        id: notifId,
         sopId: doc.id || '',
         sopTitle: doc.header.processName || 'Untitled Process',
-        senderName: doc.authorName || 'Biplob Hossain',
+        senderName: doc.authorName || doc.header?.preparedBy?.name || 'Process Concern',
         senderRole: 'Prepared By',
         targetUserId: doc.checkedById,
         targetRole: 'checked_by',
         type: 'review_request',
-        message: `${doc.authorName || 'ইঞ্জিনিয়ার'} "${doc.header.processName}" উচ্চপদস্থ পর্যালোচনার জন্য পাঠিয়েছেন।`,
+        message: `${doc.authorName || 'Engineer'} submitted "${doc.header.processName || 'Process'}" for section review & signature.`,
         timestamp: doc.updatedAt || doc.createdAt || new Date().toISOString(),
-        isRead: false,
+        isRead: readSet.has(notifId),
       });
     }
 
-    // If user is Approved By (Kamrul) or Admin, and status is 'forwarded_to_approver'
+    // 2. If user is Approved By (Kamrul) or Admin, and status is 'forwarded_to_approver'
     if (
       (currentUser.role === 'approved_by' || currentUser.role === 'admin') &&
       doc.status === 'forwarded_to_approver'
     ) {
+      const notifId = `notif_${doc.id}_appr`;
       notifications.push({
-        id: `notif_${doc.id}_appr`,
+        id: notifId,
         sopId: doc.id || '',
         sopTitle: doc.header.processName || 'Untitled Process',
-        senderName: doc.checkedByName || 'Checked By In-Charge',
+        senderName: doc.checkedByName || doc.header?.checkedBy?.name || 'Section In-Charge',
         senderRole: 'Checked By',
         targetUserId: doc.approvedById || 'Kamrul',
         targetRole: 'approved_by',
         type: 'approval_request',
-        message: `${doc.checkedByName || 'পর্যালোচক'} "${doc.header.processName}" চূড়ান্ত অনুমোদনের জন্য পাঠিয়েছেন।`,
+        message: `${doc.checkedByName || 'Reviewer'} checked & forwarded "${doc.header.processName || 'Process'}" for final approval.`,
         timestamp: doc.updatedAt || doc.createdAt || new Date().toISOString(),
-        isRead: false,
+        isRead: readSet.has(notifId),
       });
     }
 
-    // If user is author (Prepared By) and document was rejected/revision requested
-    if (
-      doc.status === 'rejected' &&
-      (doc.authorId === currentUser.id || currentUser.role === 'admin')
-    ) {
+    // 3. If user is author (Prepared By) and document was rejected/revision requested
+    if (doc.status === 'rejected' && isDocAuthor) {
+      const notifId = `notif_${doc.id}_rev_${doc.updatedAt || ''}`;
       notifications.push({
-        id: `notif_${doc.id}_rev`,
+        id: notifId,
         sopId: doc.id || '',
         sopTitle: doc.header.processName || 'Untitled Process',
         senderName: doc.checkedByName || 'Reviewer',
@@ -505,31 +544,35 @@ export async function getUserNotifications(currentUser: UserProfile | null): Pro
         targetUserId: doc.authorId,
         targetRole: 'prepared_by',
         type: 'revision_request',
-        message: `"${doc.header.processName}" সংশোধনের জন্য ফেরত পাঠানো হয়েছে: ${doc.rejectionReason || 'সংশোধন প্রয়োজন'}`,
+        message: `Revision requested on "${doc.header.processName}": ${doc.rejectionReason || 'Please review changes.'}`,
         timestamp: doc.updatedAt || doc.createdAt || new Date().toISOString(),
-        isRead: false,
+        isRead: readSet.has(notifId),
       });
     }
 
-    // If user is author and document is approved
-    if (
-      doc.status === 'approved' &&
-      (doc.authorId === currentUser.id || currentUser.role === 'admin')
-    ) {
+    // 4. If user is author (Prepared By) or Admin and document is approved!
+    if (doc.status === 'approved' && isDocAuthor) {
+      const notifId = `notif_${doc.id}_done`;
       notifications.push({
-        id: `notif_${doc.id}_done`,
+        id: notifId,
         sopId: doc.id || '',
         sopTitle: doc.header.processName || 'Untitled Process',
-        senderName: doc.approvedByName || 'Kamrul Hasan',
+        senderName: doc.approvedByName || doc.header?.approvedBy?.name || 'Kamrul (44819)',
         senderRole: 'Approved By',
         targetUserId: doc.authorId,
         targetRole: 'prepared_by',
         type: 'approved',
-        message: `অভিনন্দন! "${doc.header.processName}" চূড়ান্তভাবে অনুমোদিত হয়েছে।`,
+        message: `Approved! "${doc.header.processName}" has been finalized & approved by ${doc.approvedByName || 'Process HOD'}.`,
         timestamp: doc.approvedAt || doc.updatedAt || new Date().toISOString(),
-        isRead: true,
+        isRead: readSet.has(notifId),
       });
     }
+  });
+
+  // Sort: unread first, then by latest timestamp
+  notifications.sort((a, b) => {
+    if (a.isRead !== b.isRead) return a.isRead ? 1 : -1;
+    return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
   });
 
   return notifications;
@@ -606,18 +649,39 @@ export async function getAllSOPs(skipCloudSync: boolean = false): Promise<SOPDoc
 }
 
 export async function getSOPById(id: string): Promise<SOPDocument | null> {
+  let doc: SOPDocument | null = null;
   try {
     const db = await openDatabase();
-    return new Promise((resolve) => {
+    doc = await new Promise((resolve) => {
       const tx = db.transaction(STORE_SOPS, 'readonly');
       const store = tx.objectStore(STORE_SOPS);
       const req = store.get(id);
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => resolve(null);
     });
-  } catch {
-    return null;
+  } catch {}
+
+  // If missing or unapproved, verify latest status from Cloud sync
+  if (!doc || doc.status !== 'approved') {
+    try {
+      const config = getCloudSyncConfig();
+      if (config.firebaseUrl && config.firebaseUrl.includes('firebaseio.com')) {
+        const cleanFbUrl = config.firebaseUrl.replace(/\/$/, '');
+        const res = await fetch(`${cleanFbUrl}/sops/${id}.json`);
+        if (res.ok) {
+          const cloudDoc = await res.json();
+          if (cloudDoc && cloudDoc.id) {
+            const db = await openDatabase();
+            const tx = db.transaction(STORE_SOPS, 'readwrite');
+            tx.objectStore(STORE_SOPS).put(cloudDoc);
+            return cloudDoc;
+          }
+        }
+      }
+    } catch {}
   }
+
+  return doc;
 }
 
 export async function saveSOP(doc: SOPDocument, user?: UserProfile, note?: string): Promise<SOPDocument> {
@@ -665,6 +729,22 @@ export async function saveSOP(doc: SOPDocument, user?: UserProfile, note?: strin
   // Push to cloud in background
   try {
     pushSopToCloud(updatedDoc).catch(() => {});
+  } catch {}
+
+  // Automatically sync to author working draft so Prepared By gets the updated status
+  try {
+    if (updatedDoc.authorId) {
+      localStorage.setItem(USER_DRAFT_PREFIX + updatedDoc.authorId, JSON.stringify(updatedDoc));
+    }
+    if (updatedDoc.header?.preparedBy?.name) {
+      localStorage.setItem(USER_DRAFT_PREFIX + updatedDoc.header.preparedBy.name, JSON.stringify(updatedDoc));
+    }
+    localStorage.setItem(USER_DRAFT_PREFIX + 'Biplob', JSON.stringify(updatedDoc));
+    localStorage.setItem(USER_DRAFT_PREFIX + '67544', JSON.stringify(updatedDoc));
+
+    // Broadcast update across active windows / tabs
+    window.dispatchEvent(new CustomEvent('walton_sop_updated', { detail: updatedDoc }));
+    localStorage.setItem('walton_sop_last_updated', Date.now().toString());
   } catch {}
 
   return updatedDoc;
@@ -757,7 +837,45 @@ export function createDefaultSopForUser(user: UserProfile): SOPDocument {
 }
 
 export async function getUserWorkingDraft(userId: string): Promise<SOPDocument | null> {
-  // 1. Check user-specific localStorage key
+  // 1. First, check Cloud for any updated draft or approved SOP for this user
+  try {
+    const cloudDraft = await syncUserDraftWithCloud(userId);
+    if (cloudDraft && cloudDraft.status === 'approved') {
+      try {
+        localStorage.setItem(USER_DRAFT_PREFIX + userId, JSON.stringify(cloudDraft));
+      } catch {}
+      return cloudDraft;
+    }
+  } catch (e) {
+    console.warn('Draft cloud check warning:', e);
+  }
+
+  // 2. Check all SOPs from DB and Cloud
+  let latestApprovedSop: SOPDocument | null = null;
+  let latestDbSop: SOPDocument | null = null;
+  try {
+    const allSOPs = await getAllSOPs(false); // Enable cloud sync!
+    const userSops = allSOPs.filter(
+      (s) =>
+        s.authorId === userId ||
+        s.authorId === '67544' ||
+        userId.toLowerCase().includes('biplob') ||
+        (s.header?.preparedBy?.name && (
+          s.header.preparedBy.name.toLowerCase().includes(userId.toLowerCase()) ||
+          s.header.preparedBy.name.includes('Biplob') ||
+          s.header.preparedBy.name.includes('67544')
+        ))
+    );
+    const cleanUserSops = userSops.filter((s) => !s.header?.processName?.includes('BOPP Tape'));
+    if (cleanUserSops.length > 0) {
+      latestApprovedSop = cleanUserSops.find((s) => s.status === 'approved') || null;
+      latestDbSop = cleanUserSops[0];
+    }
+  } catch (e) {
+    console.warn('IndexedDB user SOP lookup failed', e);
+  }
+
+  // 3. Check user-specific localStorage key
   try {
     const raw = localStorage.getItem(USER_DRAFT_PREFIX + userId);
     if (raw) {
@@ -770,6 +888,44 @@ export async function getUserWorkingDraft(userId: string): Promise<SOPDocument |
         ) {
           localStorage.removeItem(USER_DRAFT_PREFIX + userId);
         } else {
+          // If latest DB SOP is approved, sync and return it!
+          if (latestApprovedSop) {
+            if (
+              latestApprovedSop.id === parsed.id ||
+              latestApprovedSop.header?.processName?.trim() === parsed.header?.processName?.trim() ||
+              parsed.status !== 'approved'
+            ) {
+              localStorage.setItem(USER_DRAFT_PREFIX + userId, JSON.stringify(latestApprovedSop));
+              return latestApprovedSop;
+            }
+          }
+
+          if (latestDbSop) {
+            const dbTime = new Date(latestDbSop.updatedAt || 0).getTime();
+            const draftTime = new Date(parsed.updatedAt || 0).getTime();
+            if (dbTime > draftTime) {
+              localStorage.setItem(USER_DRAFT_PREFIX + userId, JSON.stringify(latestDbSop));
+              return latestDbSop;
+            }
+          }
+
+          // Check if this specific document was updated or approved in central DB / Cloud
+          if (parsed.id) {
+            try {
+              const centralDoc = await getSOPById(parsed.id);
+              if (
+                centralDoc &&
+                (centralDoc.status === 'approved' ||
+                  centralDoc.status !== parsed.status ||
+                  new Date(centralDoc.updatedAt || 0).getTime() > new Date(parsed.updatedAt || 0).getTime())
+              ) {
+                localStorage.setItem(USER_DRAFT_PREFIX + userId, JSON.stringify(centralDoc));
+                return centralDoc;
+              }
+            } catch (err) {
+              console.warn('Central DB sync check failed', err);
+            }
+          }
           return parsed;
         }
       }
@@ -778,31 +934,19 @@ export async function getUserWorkingDraft(userId: string): Promise<SOPDocument |
     console.warn('Draft localStorage read failed', e);
   }
 
-  // 2. Fetch latest draft from Cloud if switching PCs
-  try {
-    const cloudDraft = await syncUserDraftWithCloud(userId);
-    if (cloudDraft) {
-      return cloudDraft;
-    }
-  } catch (e) {
-    console.warn('Draft cloud read failed', e);
+  // 4. Return approved or latest DB SOP if available
+  if (latestApprovedSop) {
+    try {
+      localStorage.setItem(USER_DRAFT_PREFIX + userId, JSON.stringify(latestApprovedSop));
+    } catch {}
+    return latestApprovedSop;
   }
 
-  // 3. Check IndexedDB for existing SOPs of this user
-  try {
-    const allSOPs = await getAllSOPs(true);
-    const userSops = allSOPs.filter(
-      (s) =>
-        s.authorId === userId ||
-        (s.header?.preparedBy?.name && s.header.preparedBy.name.toLowerCase().includes(userId.toLowerCase()))
-    );
-    // Ignore legacy trial BOPP tape SOPs
-    const cleanSops = userSops.filter((s) => !s.header?.processName?.includes('BOPP Tape'));
-    if (cleanSops.length > 0) {
-      return cleanSops[0];
-    }
-  } catch (e) {
-    console.warn('IndexedDB user SOP lookup failed', e);
+  if (latestDbSop) {
+    try {
+      localStorage.setItem(USER_DRAFT_PREFIX + userId, JSON.stringify(latestDbSop));
+    } catch {}
+    return latestDbSop;
   }
 
   return null;
@@ -1402,7 +1546,18 @@ export async function approveSOP(
     auditTrail: [...(doc.auditTrail || []), auditEntry],
   };
 
-  return saveSOP(approvedDoc, user, auditEntry.note);
+  const saved = await saveSOP(approvedDoc, user, auditEntry.note);
+
+  // Directly push approved document to author's cloud draft
+  try {
+    if (saved.authorId) {
+      syncUserDraftWithCloud(saved.authorId, saved).catch(() => {});
+    }
+    syncUserDraftWithCloud('Biplob', saved).catch(() => {});
+    syncUserDraftWithCloud('67544', saved).catch(() => {});
+  } catch {}
+
+  return saved;
 }
 
 // Workflow: Reject / Request Revision

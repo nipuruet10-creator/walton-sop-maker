@@ -42,7 +42,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
     const cleanPass = password.trim();
 
     if (!cleanUser || !cleanPass) {
-      setErrorMsg('দয়া করে আইডি (ID / Username) এবং পাসওয়ার্ড লিখুন।');
+      setErrorMsg('Please enter both User ID and password.');
       return;
     }
 
@@ -53,10 +53,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         onLoginSuccess(user);
         onClose();
       } else {
-        setErrorMsg('ভুল ইউজার আইডি অথবা পাসওয়ার্ড! অনুগ্রহ করে সঠিক তথ্য প্রদান করুন।');
+        setErrorMsg('Invalid User ID or password. Please verify your credentials.');
       }
     } catch {
-      setErrorMsg('লগইন করার সময় সার্ভার বা সিস্টেমে ত্রুটি ঘটেছে। আবার চেষ্টা করুন।');
+      setErrorMsg('System authentication error. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -86,7 +86,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 <span>Walton SOP Portal Login</span>
               </h2>
               <p className="text-[11px] text-blue-200">
-                প্রসেস অটোমেশন ও স্ট্যান্ডার্ড অপারেটিং প্রসিডিউর
+                Process Automation & Standard Operating Procedures
               </p>
             </div>
           </div>
@@ -104,13 +104,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
               <User className="w-3.5 h-3.5 text-blue-600" />
-              <span>ইউজার আইডি বা কর্মকর্তা আইডি (Username / ID)</span>
+              <span>User ID / Login ID</span>
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="যেমন: Biplob বা 67544, Sazzad বা 50463"
+              placeholder="e.g. Biplob (67544) or Sazzad (50463)"
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition font-medium"
               autoFocus
               required
@@ -121,7 +121,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <KeyRound className="w-3.5 h-3.5 text-blue-600" />
-                <span>পাসওয়ার্ড (Password)</span>
+                <span>Password</span>
               </span>
               <button
                 type="button"
@@ -131,12 +131,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 {showPassword ? (
                   <>
                     <EyeOff className="w-3 h-3" />
-                    <span>লুকান</span>
+                    <span>Hide</span>
                   </>
                 ) : (
                   <>
                     <Eye className="w-3 h-3" />
-                    <span>দেখুন</span>
+                    <span>Show</span>
                   </>
                 )}
               </button>
@@ -146,7 +146,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="আপনার গোপন পাসওয়ার্ড লিখুন"
+                placeholder="Enter your account password"
                 className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition"
                 required
               />
@@ -154,7 +154,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1 rounded-lg transition cursor-pointer"
-                title={showPassword ? 'পাসওয়ার্ড লুকান (Hide)' : 'পাসওয়ার্ড দেখুন (View)'}
+                title={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? <EyeOff className="w-4 h-4 text-blue-600" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -167,7 +167,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-700 to-blue-600 hover:from-blue-600 hover:to-blue-500 text-white font-bold rounded-xl text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             <LogIn className="w-4 h-4" />
-            <span>{isSubmitting ? 'যাচাই করা হচ্ছে...' : 'লগইন করুন (Sign In)'}</span>
+            <span>{isSubmitting ? 'Authenticating...' : 'Sign In'}</span>
           </button>
 
           <div className="pt-3 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-400 text-center">

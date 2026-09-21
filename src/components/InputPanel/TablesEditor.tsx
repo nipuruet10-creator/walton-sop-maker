@@ -56,7 +56,7 @@ export const TablesEditor: React.FC<TablesEditorProps> = ({
             <Package className="w-3.5 h-3.5 text-blue-600" />
             <span>Parts List Table</span>
             <span className="text-[10px] text-blue-600 font-normal bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-              SOP পেপারে ৩টি রো
+              3 Rows on SOP Layout
             </span>
           </div>
           <button
@@ -114,7 +114,7 @@ export const TablesEditor: React.FC<TablesEditorProps> = ({
             <Wrench className="w-3.5 h-3.5 text-amber-600" />
             <span>Tools & Equipments Table</span>
             <span className="text-[10px] text-amber-700 font-normal bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-              SOP পেপারে ৩টি রো
+              3 rows on SOP paper
             </span>
           </div>
           <button
