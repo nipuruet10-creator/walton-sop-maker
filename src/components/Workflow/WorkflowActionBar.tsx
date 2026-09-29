@@ -227,7 +227,7 @@ export const WorkflowActionBar: React.FC<WorkflowActionBarProps> = ({
   const isAdmin = currentUser?.role === 'admin';
 
   return (
-    <div className="no-print w-full bg-slate-50 border-b border-slate-200/90 shadow-xs px-3 sm:px-4 py-1.5 flex items-center justify-between gap-3 text-xs z-30 select-none flex-nowrap overflow-x-auto scrollbar-none">
+    <div className="no-print w-full bg-white border-b border-slate-200/90 shadow-2xs px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs z-20 select-none">
       {/* Left: Connected 3-Stage Approval Stepper */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider hidden xl:inline">

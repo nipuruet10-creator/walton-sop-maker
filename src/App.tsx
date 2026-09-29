@@ -59,12 +59,8 @@ import {
   FileText,
   ShieldCheck,
   Table as TableIcon,
-  ChevronLeft,
-  ChevronRight,
   FileSpreadsheet,
   FileDown,
-  Type,
-  LayoutGrid,
   RotateCcw,
   Printer,
   Download,
@@ -156,10 +152,31 @@ export const App: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('photos');
   const [zoom, setZoom] = useState<number>(0.85);
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [studioMode, setStudioMode] = useState<'editor' | 'canvas' | 'split'>('editor');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const canvasContainerRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isGeneratingQuality, setIsGeneratingQuality] = useState<boolean>(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
+
+  // Auto-fit zoom calculation for A4 preview canvas based on container width
+  useEffect(() => {
+    if (currentView !== 'editor') return;
+    const calculateAutoFit = () => {
+      if (!canvasContainerRef.current) return;
+      const width = canvasContainerRef.current.clientWidth;
+      if (width <= 0) return;
+      const scale = Math.min(1.05, Math.max(0.35, (width - 48) / 1123));
+      setZoom(Number(scale.toFixed(2)));
+    };
+    calculateAutoFit();
+    const t = setTimeout(calculateAutoFit, 150);
+    window.addEventListener('resize', calculateAutoFit);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('resize', calculateAutoFit);
+    };
+  }, [studioMode, currentView]);
 
   // Live Notifications
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -657,6 +674,8 @@ export const App: React.FC = () => {
         activeConcern={activeConcern}
         pendingApprovalsCount={pendingApprovalsCount}
         onOpenAdminPanel={() => setIsAdminModalOpen(true)}
+        isOpenMobile={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
 
       {/* 2. MAIN APPLICATION CONTENT VIEWPORT */}
@@ -686,8 +705,7 @@ export const App: React.FC = () => {
           }}
           isSyncing={isSyncing}
           onSelectSopById={handleSelectSopById}
-          zoom={zoom}
-          setZoom={setZoom}
+          onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
         />
 
         {/* View Router Main Container */}
@@ -738,8 +756,131 @@ export const App: React.FC = () => {
 
           {/* VIEW 3: FULL SOP STUDIO / LIVE EDITOR & CANVAS */}
           {currentView === 'editor' && (
-            <div className="h-full flex flex-col overflow-hidden animate-in fade-in duration-150">
-              {/* Workflow & Approval Status Action Bar */}
+            <div className="h-full flex flex-col overflow-hidden bg-[#F8FAFC]">
+              {/* 1. SOP Studio Top Bar (Breadcrumb, Mode Switcher, Quick Actions) */}
+              <div className="bg-white border-b border-slate-200/90 shadow-2xs px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-20">
+                {/* Left: Breadcrumbs & Status */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentView('workplace')}
+                    className="text-xs font-bold text-slate-500 hover:text-blue-600 transition flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <span>← {activeConcern.shortName || 'Workplace'}</span>
+                  </button>
+                  <span className="text-slate-300 font-normal">/</span>
+                  <span
+                    className="text-xs sm:text-sm font-extrabold text-slate-900 truncate max-w-[180px] sm:max-w-xs"
+                    title={data.header.processName}
+                  >
+                    {data.header.processName || 'New Standard Operating Procedure'}
+                  </span>
+                  {data.status === 'approved' ? (
+                    <span className="text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+                      <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                      <span>Approved &amp; Locked</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono font-bold bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full shrink-0">
+                      Draft
+                    </span>
+                  )}
+                </div>
+
+                {/* Center: Mode Switcher (Edit Parameters | Live Canvas | Split View) */}
+                <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setStudioMode('editor')}
+                    className={`px-3 py-1 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      studioMode === 'editor'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    }`}
+                  >
+                    <span>✏️</span>
+                    <span>Edit Parameters</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStudioMode('canvas')}
+                    className={`px-3 py-1 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                      studioMode === 'canvas'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    }`}
+                  >
+                    <span>👁️</span>
+                    <span>Live Canvas (A4)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStudioMode('split')}
+                    className={`hidden xl:flex px-3 py-1 rounded-xl font-bold transition items-center gap-1.5 cursor-pointer ${
+                      studioMode === 'split'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                    }`}
+                  >
+                    <span>◫</span>
+                    <span>Side-by-Side</span>
+                  </button>
+                </div>
+
+                {/* Right: Quick Actions (Excel, PDF, Reset, Print, JSON) */}
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                  {data.status !== 'approved' && (
+                    <button
+                      type="button"
+                      onClick={handleResetSop}
+                      className="px-2.5 py-1.5 rounded-xl text-slate-500 hover:text-rose-600 hover:bg-rose-50 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                      title="Reset parameters to factory starter pattern"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Reset</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handlePrint}
+                    className="hidden sm:flex px-2.5 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-bold transition cursor-pointer items-center gap-1 border border-slate-200"
+                    title="Print SOP Canvas"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Print</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportJson}
+                    className="hidden sm:flex px-2.5 py-1.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-bold transition cursor-pointer items-center gap-1 border border-slate-200"
+                    title="Export Backup JSON"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                    <span>JSON</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                    title="Export structured Excel data"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-200" />
+                    <span className="hidden sm:inline">Excel</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadPdf}
+                    disabled={isDownloadingPdf}
+                    className="px-3 sm:px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    title="Download Vector A4 PDF"
+                  >
+                    <FileDown className="w-3.5 h-3.5 text-blue-200" />
+                    <span>{isDownloadingPdf ? 'Creating...' : 'PDF'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. 3-Step Approval Route Stepper Bar */}
               <WorkflowActionBar
                 currentSop={data}
                 currentUser={currentUser}
@@ -750,94 +891,302 @@ export const App: React.FC = () => {
                 onResetSop={handleResetSop}
               />
 
-              {/* Main Workspace Area (Left Input Panel + Right Live Canvas) */}
+              {/* 3. Studio Main Workspace Body */}
               <div className="flex-1 flex overflow-hidden relative">
-                {/* Left Side: Input Panel (Collapsible) */}
-                <aside
-                  className={`no-print transition-all duration-300 ease-in-out bg-white border-r border-slate-300 flex flex-col z-20 shrink-0 ${
-                    isSidebarOpen ? 'w-[420px] lg:w-[480px]' : 'w-0'
-                  }`}
-                  style={{ overflow: isSidebarOpen ? 'visible' : 'hidden' }}
-                >
-                  {isSidebarOpen && (
-                    <div className="flex flex-col h-full overflow-hidden">
-                      {/* Panel Header & Quick Actions */}
-                      <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                {/* MODE A: FULL-PAGE PARAMETER EDITOR */}
+                {studioMode === 'editor' && (
+                  <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+                    <div className="max-w-4xl mx-auto bg-white border border-slate-200/90 rounded-3xl shadow-xs overflow-hidden">
+                      {/* Editor Card Header */}
+                      <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
                         <div>
-                          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                            SOP Parameter Editor
+                          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-blue-600">
+                            {activeConcern.name}
+                          </div>
+                          <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                            SOP Parameters &amp; Procedure Editor
                           </h2>
-                          <p className="text-[10px] text-slate-400">
-                            {data.status === 'approved'
-                              ? 'Officially Approved & Locked'
-                              : 'Images, Banglish procedure, header & tables'}
-                          </p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={() => setStudioMode('canvas')}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition cursor-pointer"
+                        >
+                          <span>👁️ Preview Live A4 Canvas</span>
+                          <span>→</span>
+                        </button>
+                      </div>
 
-                        <div className="flex items-center gap-1">
-                          {data.status !== 'approved' && (
+                      {/* Tab Navigation Pills */}
+                      <div className="bg-slate-100/80 border-b border-slate-200 p-2 flex items-center justify-start gap-1 overflow-x-auto">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('photos')}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                            activeTab === 'photos'
+                              ? 'bg-blue-600 text-white shadow-xs font-bold'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                          }`}
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          <span>Photos ({data.photos.length})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('procedure')}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                            activeTab === 'procedure'
+                              ? 'bg-blue-600 text-white shadow-xs font-bold'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                          }`}
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Procedure &amp; AI</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('header')}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                            activeTab === 'header'
+                              ? 'bg-blue-600 text-white shadow-xs font-bold'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                          }`}
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>Header Specifications</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('safety')}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                            activeTab === 'safety'
+                              ? 'bg-blue-600 text-white shadow-xs font-bold'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                          }`}
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          <span>Safety PPE</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('tables')}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                            activeTab === 'tables'
+                              ? 'bg-blue-600 text-white shadow-xs font-bold'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                          }`}
+                        >
+                          <TableIcon className="w-3.5 h-3.5" />
+                          <span>Parts &amp; Tools</span>
+                        </button>
+                      </div>
+
+                      {/* Content Panels */}
+                      <div className="p-4 sm:p-6">
+                        {data.status === 'approved' ? (
+                          <div className="p-8 text-center space-y-4 bg-emerald-50 rounded-2xl border border-emerald-200">
+                            <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+                              <ShieldCheck className="w-8 h-8" />
+                            </div>
+                            <div className="space-y-1 max-w-sm mx-auto">
+                              <h3 className="font-black text-slate-900 text-base">Document Officially Approved</h3>
+                              <p className="text-xs text-slate-600 leading-relaxed">
+                                This SOP has received final Head of Department sign-off. Editing is locked to guarantee factory compliance. Only PDF download and viewing are enabled.
+                              </p>
+                            </div>
                             <button
                               type="button"
-                              onClick={handleResetSop}
-                              className="flex items-center gap-1 bg-rose-900/80 hover:bg-rose-800 text-rose-200 text-[11px] font-bold px-2 py-1 rounded transition cursor-pointer border border-rose-700/60"
-                              title="Reset all form inputs"
+                              onClick={handleDownloadPdf}
+                              disabled={isDownloadingPdf}
+                              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md transition cursor-pointer"
                             >
-                              <RotateCcw className="w-3 h-3 text-rose-300" />
-                              <span>Reset</span>
+                              <FileDown className="w-4 h-4" />
+                              <span>{isDownloadingPdf ? 'Generating PDF...' : 'Download Official PDF'}</span>
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={handlePrint}
-                            className="flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold px-2 py-1 rounded transition cursor-pointer"
-                            title="Print SOP Canvas"
-                          >
-                            <Printer className="w-3 h-3 text-slate-300" />
-                            <span>Print</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleExportJson}
-                            className="flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold px-2 py-1 rounded transition cursor-pointer"
-                            title="Export Backup JSON"
-                          >
-                            <Download className="w-3 h-3 text-slate-300" />
-                            <span>JSON</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleExportExcel}
-                            className="flex items-center gap-1 bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-1 rounded transition cursor-pointer"
-                          >
-                            <FileSpreadsheet className="w-3 h-3 text-emerald-200" />
-                            <span>Excel</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleDownloadPdf}
-                            disabled={isDownloadingPdf}
-                            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold px-2.5 py-1 rounded transition cursor-pointer disabled:opacity-50"
-                          >
-                            <FileDown className="w-3 h-3 text-blue-200" />
-                            <span>{isDownloadingPdf ? 'Creating...' : 'PDF'}</span>
-                          </button>
+                          </div>
+                        ) : (
+                          <>
+                            {activeTab === 'photos' && (
+                              <ImageManager
+                                photos={data.photos}
+                                onChange={(photos) => setData((prev) => ({ ...prev, photos }))}
+                                imageFit={data.imageFit}
+                                onUpdateFit={(fit) => setData((prev) => ({ ...prev, imageFit: fit }))}
+                                gridCols={data.gridCols}
+                                onUpdateGridCols={(cols) => setData((prev) => ({ ...prev, gridCols: cols }))}
+                              />
+                            )}
+
+                            {activeTab === 'procedure' && (
+                              <BanglishProcedureEditor
+                                procedure={data.procedure}
+                                onChange={(procedure) => setData((prev) => ({ ...prev, procedure }))}
+                                onGenerate={handleAutoGenerate}
+                                isGenerating={isGenerating}
+                                onGenerateQuality={handleAutoGenerateQuality}
+                                isGeneratingQuality={isGeneratingQuality}
+                                hasApiKey={Boolean(openRouterKey || geminiKey)}
+                                activeProvider={activeProvider}
+                                activeModel={openRouterModel}
+                                onOpenAiModal={() => setIsApiKeyModalOpen(true)}
+                                stepFontSize={data.stepFontSize}
+                                onFontSizeChange={(stepFontSize) => setData((prev) => ({ ...prev, stepFontSize }))}
+                                qualityFontSize={data.qualityFontSize}
+                                onQualityFontSizeChange={(qualityFontSize) => setData((prev) => ({ ...prev, qualityFontSize }))}
+                                lastUsedEngine={lastUsedEngine}
+                              />
+                            )}
+
+                            {activeTab === 'header' && (
+                              <HeaderEditor
+                                header={data.header}
+                                onChange={(header) => setData((prev) => ({ ...prev, header }))}
+                              />
+                            )}
+
+                            {activeTab === 'safety' && (
+                              <SafetyEditor
+                                safety={data.safety}
+                                onChange={(safety) => setData((prev) => ({ ...prev, safety }))}
+                              />
+                            )}
+
+                            {activeTab === 'tables' && (
+                              <TablesEditor
+                                parts={data.parts}
+                                tools={data.tools}
+                                onPartsChange={(parts) => setData((prev) => ({ ...prev, parts }))}
+                                onToolsChange={(tools) => setData((prev) => ({ ...prev, tools }))}
+                              />
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* MODE B: LIVE FULL-PAGE A4 CANVAS */}
+                {studioMode === 'canvas' && (
+                  <main
+                    ref={canvasContainerRef}
+                    className="flex-1 overflow-auto bg-slate-100 p-4 sm:p-6 flex flex-col items-center justify-start print:p-0 print:bg-white print:overflow-visible"
+                  >
+                    {/* Canvas Controls Toolbar */}
+                    <div className="no-print w-full max-w-[1123px] mb-4 bg-white border border-slate-200/90 rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
+                      {/* Font Selectors */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-slate-700">Step Font:</span>
+                          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                            {(['auto', 'compact', 'normal', 'large', 'xlarge'] as const).map((opt) => (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() => setData((prev) => ({ ...prev, stepFontSize: opt }))}
+                                className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer capitalize ${
+                                  (data.stepFontSize || 'normal') === opt
+                                    ? 'bg-blue-600 text-white font-bold shadow-xs'
+                                    : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Columns */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-semibold text-slate-700">Cols:</span>
+                          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                            {([0, 2, 3] as const).map((opt) => (
+                              <button
+                                key={opt}
+                                type="button"
+                                onClick={() => setData((prev) => ({ ...prev, gridCols: opt }))}
+                                className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
+                                  (data.gridCols || 0) === opt
+                                    ? 'bg-blue-600 text-white font-bold shadow-xs'
+                                    : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                              >
+                                {opt === 0 ? 'Auto' : `${opt} Col`}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
 
-                      {/* Approved Document Lock Banner */}
-                      {data.status === 'approved' && (
-                        <div className="bg-emerald-50 border-b border-emerald-200 p-2.5 flex items-center gap-2 text-xs text-emerald-950">
-                          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <div className="leading-tight">
-                            <strong className="block text-emerald-900">Document Officially Approved</strong>
-                            <span className="text-[10.5px] text-emerald-700">
-                              Editing is locked to ensure compliance. Only official PDF download is enabled.
-                            </span>
-                          </div>
+                      {/* Zoom Controls */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 font-mono text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setZoom((z) => Math.max(0.35, Number((z - 0.05).toFixed(2))))}
+                            className="px-2 py-0.5 hover:bg-white rounded transition cursor-pointer"
+                          >
+                            -
+                          </button>
+                          <span className="px-2 font-bold">{Math.round(zoom * 100)}%</span>
+                          <button
+                            type="button"
+                            onClick={() => setZoom((z) => Math.min(1.2, Number((z + 0.05).toFixed(2))))}
+                            className="px-2 py-0.5 hover:bg-white rounded transition cursor-pointer"
+                          >
+                            +
+                          </button>
                         </div>
-                      )}
+                        <button
+                          type="button"
+                          onClick={() => setStudioMode('editor')}
+                          className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>✏️ Edit Inputs</span>
+                        </button>
+                      </div>
+                    </div>
 
-                      {/* Tabs Header */}
+                    {/* SOP Paper Render Container */}
+                    <div
+                      id="sop-paper-wrapper"
+                      className="transition-transform duration-200 origin-top shadow-2xl rounded-xs print:shadow-none bg-white"
+                      style={{
+                        transform: `scale(${zoom})`,
+                        transformOrigin: 'top center',
+                      }}
+                    >
+                      <SOPPaper
+                        data={data}
+                        onUpdateHeader={(updates) =>
+                          setData((prev) => ({ ...prev, header: { ...prev.header, ...updates } }))
+                        }
+                        onUpdateFontSize={(size) => setData((prev) => ({ ...prev, stepFontSize: size }))}
+                        onUpdateStep={(idx, val) => {
+                          const steps = [...data.procedure.steps];
+                          steps[idx] = val;
+                          setData((prev) => ({ ...prev, procedure: { ...prev.procedure, steps } }));
+                        }}
+                        onUpdateQuality={(idx, val) => {
+                          const qualityPoints = [...data.procedure.qualityPoints];
+                          qualityPoints[idx] = val;
+                          setData((prev) => ({ ...prev, procedure: { ...prev.procedure, qualityPoints } }));
+                        }}
+                        onUpdateGeneral={(idx, val) => {
+                          const generalInstructions = [...data.procedure.generalInstructions];
+                          generalInstructions[idx] = val;
+                          setData((prev) => ({ ...prev, procedure: { ...prev.procedure, generalInstructions } }));
+                        }}
+                      />
+                    </div>
+                  </main>
+                )}
+
+                {/* MODE C: SPLIT VIEW (Side-by-Side on Ultra-wide Screens) */}
+                {studioMode === 'split' && (
+                  <>
+                    <aside className="w-[450px] xl:w-[480px] shrink-0 bg-white border-r border-slate-200/90 flex flex-col h-full overflow-hidden">
+                      {/* Tabs Bar */}
                       <div className="bg-slate-100 border-b border-slate-200 p-1.5 flex items-center justify-between gap-1 shrink-0 overflow-x-auto">
                         <button
                           type="button"
@@ -851,7 +1200,6 @@ export const App: React.FC = () => {
                           <ImageIcon className="w-3.5 h-3.5" />
                           <span>Photos ({data.photos.length})</span>
                         </button>
-
                         <button
                           type="button"
                           onClick={() => setActiveTab('procedure')}
@@ -862,9 +1210,8 @@ export const App: React.FC = () => {
                           }`}
                         >
                           <Sparkles className="w-3.5 h-3.5" />
-                          <span>Procedure &amp; AI</span>
+                          <span>Procedure</span>
                         </button>
-
                         <button
                           type="button"
                           onClick={() => setActiveTab('header')}
@@ -877,7 +1224,6 @@ export const App: React.FC = () => {
                           <FileText className="w-3.5 h-3.5" />
                           <span>Header</span>
                         </button>
-
                         <button
                           type="button"
                           onClick={() => setActiveTab('safety')}
@@ -890,7 +1236,6 @@ export const App: React.FC = () => {
                           <ShieldCheck className="w-3.5 h-3.5" />
                           <span>Safety</span>
                         </button>
-
                         <button
                           type="button"
                           onClick={() => setActiveTab('tables')}
@@ -901,259 +1246,113 @@ export const App: React.FC = () => {
                           }`}
                         >
                           <TableIcon className="w-3.5 h-3.5" />
-                          <span>Parts/Tools</span>
+                          <span>Tables</span>
                         </button>
                       </div>
 
-                      {/* Tab Panels Content */}
-                      {data.status === 'approved' ? (
-                        <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center text-center space-y-4 bg-emerald-50/50 m-3 rounded-2xl border border-emerald-200">
-                          <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shadow-xs">
-                            <ShieldCheck className="w-8 h-8" />
+                      {/* Content */}
+                      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        {data.status === 'approved' ? (
+                          <div className="p-6 text-center space-y-3 bg-emerald-50 rounded-2xl border border-emerald-200">
+                            <ShieldCheck className="w-8 h-8 text-emerald-600 mx-auto" />
+                            <h4 className="font-bold text-slate-800 text-xs">Approved &amp; Locked</h4>
+                            <p className="text-[11px] text-slate-500">Editing disabled.</p>
                           </div>
-                          <div className="space-y-1 max-w-xs">
-                            <h3 className="font-black text-slate-900 text-sm">Official SOP Document Locked</h3>
-                            <p className="text-xs text-slate-600 leading-relaxed">
-                              This Standard Operating Procedure has received final Head of Department approval. To preserve technical compliance, editing parameters is disabled.
-                            </p>
-                          </div>
-                          <div className="pt-2">
-                            <button
-                              type="button"
-                              onClick={handleDownloadPdf}
-                              disabled={isDownloadingPdf}
-                              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md transition cursor-pointer disabled:opacity-50"
-                            >
-                              <FileDown className="w-4 h-4" />
-                              <span>{isDownloadingPdf ? 'Generating PDF...' : 'Download Official PDF'}</span>
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                          {activeTab === 'photos' && (
-                            <ImageManager
-                              photos={data.photos}
-                              onChange={(photos) => setData((prev) => ({ ...prev, photos }))}
-                              imageFit={data.imageFit}
-                              onUpdateFit={(fit) => setData((prev) => ({ ...prev, imageFit: fit }))}
-                              gridCols={data.gridCols}
-                              onUpdateGridCols={(cols) => setData((prev) => ({ ...prev, gridCols: cols }))}
-                            />
-                          )}
-
-                          {activeTab === 'procedure' && (
-                            <BanglishProcedureEditor
-                              procedure={data.procedure}
-                              onChange={(procedure) => setData((prev) => ({ ...prev, procedure }))}
-                              onGenerate={handleAutoGenerate}
-                              isGenerating={isGenerating}
-                              onGenerateQuality={handleAutoGenerateQuality}
-                              isGeneratingQuality={isGeneratingQuality}
-                              hasApiKey={Boolean(openRouterKey || geminiKey)}
-                              activeProvider={activeProvider}
-                              activeModel={openRouterModel}
-                              onOpenAiModal={() => setIsApiKeyModalOpen(true)}
-                              stepFontSize={data.stepFontSize}
-                              onFontSizeChange={(stepFontSize) => setData((prev) => ({ ...prev, stepFontSize }))}
-                              qualityFontSize={data.qualityFontSize}
-                              onQualityFontSizeChange={(qualityFontSize) => setData((prev) => ({ ...prev, qualityFontSize }))}
-                              lastUsedEngine={lastUsedEngine}
-                            />
-                          )}
-
-                          {activeTab === 'header' && (
-                            <HeaderEditor
-                              header={data.header}
-                              onChange={(header) => setData((prev) => ({ ...prev, header }))}
-                            />
-                          )}
-
-                          {activeTab === 'safety' && (
-                            <SafetyEditor
-                              safety={data.safety}
-                              onChange={(safety) => setData((prev) => ({ ...prev, safety }))}
-                            />
-                          )}
-
-                          {activeTab === 'tables' && (
-                            <TablesEditor
-                              parts={data.parts}
-                              tools={data.tools}
-                              onPartsChange={(parts) => setData((prev) => ({ ...prev, parts }))}
-                              onToolsChange={(tools) => setData((prev) => ({ ...prev, tools }))}
-                            />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </aside>
-
-                {/* Sidebar Collapse Toggle Button */}
-                <button
-                  type="button"
-                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                  className="no-print absolute top-3 left-0 z-30 bg-slate-900 text-white p-1 rounded-r-md hover:bg-blue-600 transition shadow-md cursor-pointer"
-                  style={{ left: isSidebarOpen ? (window.innerWidth >= 1024 ? 480 : 420) : 0 }}
-                  title={isSidebarOpen ? 'Collapse Editor' : 'Expand Editor'}
-                >
-                  {isSidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                </button>
-
-                {/* Right Side: Live SOP Paper Preview Container */}
-                <main className="flex-1 overflow-auto bg-slate-200/90 p-4 sm:p-8 flex flex-col items-center justify-start print:p-0 print:bg-white print:overflow-visible">
-                  {/* Canvas Quick Layout Bar */}
-                  <div className="no-print w-full max-w-[1123px] mb-3 bg-white border border-slate-300 rounded-xl px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
-                    {/* Font Size Selector */}
-                    <div className="flex items-center gap-1.5">
-                      <span className="flex items-center gap-1 font-semibold text-slate-700">
-                        <Type className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Step Font:</span>
-                      </span>
-                      <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                        {(
-                          [
-                            { id: 'auto', label: 'Auto' },
-                            { id: 'compact', label: 'Compact' },
-                            { id: 'normal', label: 'Normal' },
-                            { id: 'large', label: 'Large' },
-                            { id: 'xlarge', label: 'X-Large' },
-                          ] as const
-                        ).map((opt) => (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => setData((prev) => ({ ...prev, stepFontSize: opt.id }))}
-                            className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
-                              (data.stepFontSize || 'normal') === opt.id
-                                ? 'bg-blue-600 text-white shadow-xs font-bold'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
+                        ) : (
+                          <>
+                            {activeTab === 'photos' && (
+                              <ImageManager
+                                photos={data.photos}
+                                onChange={(photos) => setData((prev) => ({ ...prev, photos }))}
+                                imageFit={data.imageFit}
+                                onUpdateFit={(fit) => setData((prev) => ({ ...prev, imageFit: fit }))}
+                                gridCols={data.gridCols}
+                                onUpdateGridCols={(cols) => setData((prev) => ({ ...prev, gridCols: cols }))}
+                              />
+                            )}
+                            {activeTab === 'procedure' && (
+                              <BanglishProcedureEditor
+                                procedure={data.procedure}
+                                onChange={(procedure) => setData((prev) => ({ ...prev, procedure }))}
+                                onGenerate={handleAutoGenerate}
+                                isGenerating={isGenerating}
+                                onGenerateQuality={handleAutoGenerateQuality}
+                                isGeneratingQuality={isGeneratingQuality}
+                                hasApiKey={Boolean(openRouterKey || geminiKey)}
+                                activeProvider={activeProvider}
+                                activeModel={openRouterModel}
+                                onOpenAiModal={() => setIsApiKeyModalOpen(true)}
+                                stepFontSize={data.stepFontSize}
+                                onFontSizeChange={(stepFontSize) => setData((prev) => ({ ...prev, stepFontSize }))}
+                                qualityFontSize={data.qualityFontSize}
+                                onQualityFontSizeChange={(qualityFontSize) => setData((prev) => ({ ...prev, qualityFontSize }))}
+                                lastUsedEngine={lastUsedEngine}
+                              />
+                            )}
+                            {activeTab === 'header' && (
+                              <HeaderEditor
+                                header={data.header}
+                                onChange={(header) => setData((prev) => ({ ...prev, header }))}
+                              />
+                            )}
+                            {activeTab === 'safety' && (
+                              <SafetyEditor
+                                safety={data.safety}
+                                onChange={(safety) => setData((prev) => ({ ...prev, safety }))}
+                              />
+                            )}
+                            {activeTab === 'tables' && (
+                              <TablesEditor
+                                parts={data.parts}
+                                tools={data.tools}
+                                onPartsChange={(parts) => setData((prev) => ({ ...prev, parts }))}
+                                onToolsChange={(tools) => setData((prev) => ({ ...prev, tools }))}
+                              />
+                            )}
+                          </>
+                        )}
                       </div>
-                    </div>
+                    </aside>
 
-                    {/* Quality Font Selector */}
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-semibold text-slate-700">Quality Font:</span>
-                      <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                        {(
-                          [
-                            { id: 'auto', label: 'Auto' },
-                            { id: 'compact', label: 'Compact' },
-                            { id: 'normal', label: 'Normal' },
-                            { id: 'large', label: 'Large' },
-                          ] as const
-                        ).map((opt) => (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => setData((prev) => ({ ...prev, qualityFontSize: opt.id }))}
-                            className={`px-1.5 py-0.5 rounded text-[10.5px] font-medium transition cursor-pointer ${
-                              (data.qualityFontSize || 'auto') === opt.id
-                                ? 'bg-amber-600 text-white shadow-xs font-bold'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
+                    {/* Right Canvas */}
+                    <main
+                      ref={canvasContainerRef}
+                      className="flex-1 overflow-auto bg-slate-100 p-4 flex flex-col items-center justify-start print:p-0 print:bg-white print:overflow-visible"
+                    >
+                      <div
+                        id="sop-paper-wrapper"
+                        className="transition-transform duration-200 origin-top shadow-2xl rounded-xs print:shadow-none bg-white"
+                        style={{
+                          transform: `scale(${zoom})`,
+                          transformOrigin: 'top center',
+                        }}
+                      >
+                        <SOPPaper
+                          data={data}
+                          onUpdateHeader={(updates) =>
+                            setData((prev) => ({ ...prev, header: { ...prev.header, ...updates } }))
+                          }
+                          onUpdateFontSize={(size) => setData((prev) => ({ ...prev, stepFontSize: size }))}
+                          onUpdateStep={(idx, val) => {
+                            const steps = [...data.procedure.steps];
+                            steps[idx] = val;
+                            setData((prev) => ({ ...prev, procedure: { ...prev.procedure, steps } }));
+                          }}
+                          onUpdateQuality={(idx, val) => {
+                            const qualityPoints = [...data.procedure.qualityPoints];
+                            qualityPoints[idx] = val;
+                            setData((prev) => ({ ...prev, procedure: { ...prev.procedure, qualityPoints } }));
+                          }}
+                          onUpdateGeneral={(idx, val) => {
+                            const generalInstructions = [...data.procedure.generalInstructions];
+                            generalInstructions[idx] = val;
+                            setData((prev) => ({ ...prev, procedure: { ...prev.procedure, generalInstructions } }));
+                          }}
+                        />
                       </div>
-                    </div>
-
-                    {/* Photo Grid Columns */}
-                    <div className="flex items-center gap-1.5">
-                      <span className="flex items-center gap-1 font-semibold text-slate-700">
-                        <LayoutGrid className="w-3.5 h-3.5 text-blue-600" />
-                        <span>Columns:</span>
-                      </span>
-                      <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                        {(
-                          [
-                            { id: 0, label: 'Auto' },
-                            { id: 2, label: '2 Col' },
-                            { id: 3, label: '3 Col' },
-                          ] as const
-                        ).map((opt) => (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => setData((prev) => ({ ...prev, gridCols: opt.id }))}
-                            className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
-                              (data.gridCols || 0) === opt.id
-                                ? 'bg-blue-600 text-white shadow-xs font-bold'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Image Fit */}
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-semibold text-slate-700">Image Fit:</span>
-                      <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                        {(
-                          [
-                            { id: 'contain', label: 'Contain' },
-                            { id: 'cover', label: 'Cover' },
-                          ] as const
-                        ).map((opt) => (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            onClick={() => setData((prev) => ({ ...prev, imageFit: opt.id }))}
-                            className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
-                              (data.imageFit || 'contain') === opt.id
-                                ? 'bg-blue-600 text-white shadow-xs font-bold'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* SOP Paper Render Container */}
-                  <div
-                    id="sop-paper-wrapper"
-                    className="transition-transform duration-200 origin-top shadow-2xl rounded-xs print:shadow-none"
-                    style={{
-                      transform: `scale(${zoom})`,
-                    }}
-                  >
-                    <SOPPaper
-                      data={data}
-                      onUpdateHeader={(updates) =>
-                        setData((prev) => ({ ...prev, header: { ...prev.header, ...updates } }))
-                      }
-                      onUpdateFontSize={(size) => setData((prev) => ({ ...prev, stepFontSize: size }))}
-                      onUpdateStep={(idx, val) => {
-                        const steps = [...data.procedure.steps];
-                        steps[idx] = val;
-                        setData((prev) => ({ ...prev, procedure: { ...prev.procedure, steps } }));
-                      }}
-                      onUpdateQuality={(idx, val) => {
-                        const qualityPoints = [...data.procedure.qualityPoints];
-                        qualityPoints[idx] = val;
-                        setData((prev) => ({ ...prev, procedure: { ...prev.procedure, qualityPoints } }));
-                      }}
-                      onUpdateGeneral={(idx, val) => {
-                        const generalInstructions = [...data.procedure.generalInstructions];
-                        generalInstructions[idx] = val;
-                        setData((prev) => ({ ...prev, procedure: { ...prev.procedure, generalInstructions } }));
-                      }}
-                    />
-                  </div>
-                </main>
+                    </main>
+                  </>
+                )}
               </div>
             </div>
           )}

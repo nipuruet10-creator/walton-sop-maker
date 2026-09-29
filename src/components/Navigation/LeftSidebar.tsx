@@ -11,6 +11,8 @@ interface LeftSidebarProps {
   activeConcern: ProcessConcern;
   pendingApprovalsCount?: number;
   onOpenAdminPanel: () => void;
+  isOpenMobile?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export const LeftSidebar: React.FC<LeftSidebarProps> = ({
@@ -20,12 +22,19 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   activeConcern,
   pendingApprovalsCount = 0,
   onOpenAdminPanel,
+  isOpenMobile = false,
+  onCloseMobile,
 }) => {
-  return (
-    <aside className="w-64 bg-white border-r border-slate-200/90 flex flex-col justify-between p-4 sticky top-0 h-screen z-30 shrink-0 no-print overflow-y-auto select-none">
+  const handleNavClick = (view: AppView) => {
+    onChangeView(view);
+    if (onCloseMobile) onCloseMobile();
+  };
+
+  const sidebarContent = (
+    <div className="w-64 bg-white flex flex-col justify-between p-4 h-full select-none">
       {/* Top: Brand & Navigation */}
       <div>
-        {/* Walton Logo (Centered & Prominent) */}
+        {/* Walton Logo (Centered & Prominent matching ac-process-monthly-report) */}
         <div className="flex items-center justify-center text-center py-2.5 px-1 mb-3 border-b border-slate-100">
           <img
             src="/walton-logo.png"
@@ -36,18 +45,18 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
 
         {/* System Subtitle */}
         <div className="text-center mb-4">
-          <div className="text-[10.5px] font-mono font-black uppercase tracking-wider text-red-600 bg-red-50 border border-red-200/80 py-0.5 px-2 rounded-md inline-block">
-            SOP AUTOMATION
+          <div className="text-[10.5px] font-mono font-black uppercase tracking-wider text-red-600 bg-red-50 border border-red-200/80 py-0.5 px-2.5 rounded-md inline-block">
+            SOP AUTOMATION SYSTEM
           </div>
           <div className="text-[11px] font-bold text-slate-700 mt-1">AC Process Development</div>
         </div>
 
-        {/* Vertical Navigation Tabs (Modeled on ac-process-monthly-report) */}
+        {/* Vertical Navigation Tabs (Exact ac-process-monthly-report style) */}
         <nav className="space-y-1.5 font-medium">
           {/* Tab 1: Dashboard */}
           <button
             type="button"
-            onClick={() => onChangeView('dashboard')}
+            onClick={() => handleNavClick('dashboard')}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-semibold transition text-left cursor-pointer ${
               currentView === 'dashboard'
                 ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25'
@@ -63,7 +72,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           {/* Tab 2: Concern Workplace */}
           <button
             type="button"
-            onClick={() => onChangeView('workplace')}
+            onClick={() => handleNavClick('workplace')}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-semibold transition text-left cursor-pointer ${
               currentView === 'workplace'
                 ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25'
@@ -72,7 +81,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           >
             <div className="flex items-center gap-3">
               <span className="text-base">{activeConcern.icon || '🏢'}</span>
-              <div className="truncate max-w-[130px]" title={activeConcern.name}>
+              <div className="truncate max-w-[125px]" title={activeConcern.name}>
                 <span className="block truncate">{activeConcern.shortName || 'Workplace'}</span>
               </div>
             </div>
@@ -88,7 +97,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           {/* Tab 3: SOP Studio (Editor & Live Canvas) */}
           <button
             type="button"
-            onClick={() => onChangeView('editor')}
+            onClick={() => handleNavClick('editor')}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-semibold transition text-left cursor-pointer ${
               currentView === 'editor'
                 ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25'
@@ -111,7 +120,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           {/* Tab 4: Approval Route */}
           <button
             type="button"
-            onClick={() => onChangeView('approval_route')}
+            onClick={() => handleNavClick('approval_route')}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-semibold transition text-left cursor-pointer ${
               currentView === 'approval_route'
                 ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25'
@@ -138,7 +147,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           {/* Tab 5: Master Archive */}
           <button
             type="button"
-            onClick={() => onChangeView('archive')}
+            onClick={() => handleNavClick('archive')}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-semibold transition text-left cursor-pointer ${
               currentView === 'archive'
                 ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25'
@@ -161,7 +170,7 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           {/* Tab 6: Plant Analytics */}
           <button
             type="button"
-            onClick={() => onChangeView('analytics')}
+            onClick={() => handleNavClick('analytics')}
             className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-semibold transition text-left cursor-pointer ${
               currentView === 'analytics'
                 ? 'bg-[#2563EB] text-white shadow-md shadow-blue-500/25'
@@ -177,7 +186,10 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           {/* Tab 7: Admin Panel (Accessible by Admin or clicked to open) */}
           <button
             type="button"
-            onClick={onOpenAdminPanel}
+            onClick={() => {
+              onOpenAdminPanel();
+              if (onCloseMobile) onCloseMobile();
+            }}
             className="w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-semibold transition text-left text-slate-600 hover:text-slate-900 hover:bg-slate-50 cursor-pointer"
           >
             <div className="flex items-center gap-3">
@@ -236,6 +248,37 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
           <span className="text-[9px] font-mono text-slate-400">Version 2.0</span>
         </div>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Persistent Sidebar (Fixed w-64) */}
+      <aside className="hidden lg:flex w-64 border-r border-slate-200/90 h-screen sticky top-0 z-30 shrink-0 no-print overflow-hidden">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile / Tablet Offcanvas Drawer */}
+      {isOpenMobile && (
+        <div className="lg:hidden fixed inset-0 z-50 flex no-print animate-in fade-in duration-150">
+          <div
+            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+            onClick={onCloseMobile}
+          />
+          <div className="relative flex-1 flex flex-col max-w-[270px] w-full bg-white shadow-2xl z-10 animate-in slide-in-from-left duration-200">
+            <div className="absolute top-3 right-3 z-20">
+              <button
+                type="button"
+                onClick={onCloseMobile}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+    </>
   );
 };

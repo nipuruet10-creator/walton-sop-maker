@@ -9,9 +9,7 @@ import {
   Bell,
   CheckCheck,
   Plus,
-  ZoomIn,
-  ZoomOut,
-  Maximize2,
+  Menu,
 } from 'lucide-react';
 
 interface TopExecutiveHeaderProps {
@@ -25,8 +23,7 @@ interface TopExecutiveHeaderProps {
   onTriggerGlobalSync: () => void;
   isSyncing?: boolean;
   onSelectSopById?: (id: string) => void;
-  zoom?: number;
-  setZoom?: React.Dispatch<React.SetStateAction<number>>;
+  onToggleMobileMenu?: () => void;
 }
 
 export const TopExecutiveHeader: React.FC<TopExecutiveHeaderProps> = ({
@@ -40,8 +37,7 @@ export const TopExecutiveHeader: React.FC<TopExecutiveHeaderProps> = ({
   onTriggerGlobalSync,
   isSyncing = false,
   onSelectSopById,
-  zoom = 0.85,
-  setZoom,
+  onToggleMobileMenu,
 }) => {
   const [isNotifOpen, setIsNotifOpen] = useState<boolean>(false);
   const [notifTab, setNotifTab] = useState<'unread' | 'all'>('unread');
@@ -82,129 +78,110 @@ export const TopExecutiveHeader: React.FC<TopExecutiveHeaderProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-xs px-4 sm:px-6 lg:px-8 py-2.5 no-print select-none">
-      <div className="flex items-center justify-between gap-4">
-        {/* Title & Subtitle */}
-        <div>
-          <div className="text-[11px] font-bold text-slate-500 tracking-wide uppercase">
-            Walton Hi-Tech Industries PLC.
-          </div>
-          <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <span>AC Process Development</span>
-            <span className="text-slate-300 font-normal">|</span>
-            <span className="text-xs font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
-              {currentView === 'dashboard'
-                ? 'Executive Dashboard'
-                : currentView === 'workplace'
-                ? activeConcern.name
-                : currentView === 'editor'
-                ? 'SOP Studio Canvas'
-                : currentView === 'approval_route'
-                ? 'Approval Route Pipeline'
-                : currentView === 'archive'
-                ? 'Master Technical Archive'
-                : 'Analytics'}
-            </span>
-          </h1>
-        </div>
-
-        {/* Right Quick Actions */}
-        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-          {/* Zoom controls (Only when in Editor view) */}
-          {currentView === 'editor' && setZoom && (
-            <div className="hidden lg:flex items-center bg-slate-100 border border-slate-200 rounded-xl p-0.5 text-xs font-mono">
-              <button
-                type="button"
-                onClick={() => setZoom((z) => Math.max(0.4, Number((z - 0.05).toFixed(2))))}
-                className="px-2 py-1 text-slate-700 hover:bg-white rounded-lg transition"
-                title="Zoom Out"
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </button>
-              <span className="px-2 py-1 font-bold text-[11px] min-w-[42px] text-center">
-                {Math.round(zoom * 100)}%
-              </span>
-              <button
-                type="button"
-                onClick={() => setZoom((z) => Math.min(1.5, Number((z + 0.05).toFixed(2))))}
-                className="px-2 py-1 text-slate-700 hover:bg-white rounded-lg transition"
-                title="Zoom In"
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setZoom(0.85)}
-                className="px-1.5 py-1 text-slate-500 hover:text-slate-900"
-                title="Reset zoom to 85%"
-              >
-                <Maximize2 className="w-3 h-3" />
-              </button>
-            </div>
+    <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-xs px-3 sm:px-6 py-2.5 no-print select-none">
+      <div className="flex items-center justify-between gap-3 max-w-[1920px] mx-auto">
+        {/* Left: Mobile Menu Toggle + Title & Subtitle */}
+        <div className="flex items-center gap-2.5 min-w-0">
+          {onToggleMobileMenu && (
+            <button
+              type="button"
+              onClick={onToggleMobileMenu}
+              className="lg:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition cursor-pointer shrink-0"
+              title="Toggle Menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
           )}
 
-          {/* Real-time Cloud Sync Badge */}
-          <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-xs">
+          <div className="min-w-0">
+            <div className="text-[10.5px] font-bold text-slate-500 tracking-wide uppercase truncate hidden sm:block">
+              Walton Hi-Tech Industries PLC.
+            </div>
+            <h1 className="text-sm sm:text-base lg:text-lg font-black text-slate-900 tracking-tight flex items-center gap-2 truncate">
+              <span className="truncate">AC Process Development</span>
+              <span className="text-slate-300 font-normal hidden sm:inline">|</span>
+              <span className="text-[11px] font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 shrink-0 hidden md:inline">
+                {currentView === 'dashboard'
+                  ? 'Executive Dashboard'
+                  : currentView === 'workplace'
+                  ? activeConcern.name
+                  : currentView === 'editor'
+                  ? 'SOP Studio'
+                  : currentView === 'approval_route'
+                  ? 'Approval Route'
+                  : currentView === 'archive'
+                  ? 'Master Archive'
+                  : 'Analytics'}
+              </span>
+            </h1>
+          </div>
+        </div>
+
+        {/* Right Quick Actions (Matching ac-process-monthly-report) */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* Live Status Badge */}
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Real-Time Live</span>
+            <span className="font-mono text-[11px]">Real-Time Live</span>
           </div>
 
-          {/* Trigger Global Cloud Sync Button */}
+          {/* Sync Data Button */}
           <button
             type="button"
             onClick={onTriggerGlobalSync}
             disabled={isSyncing}
-            title="Synchronize latest SOPs & approval statuses from Google Cloud"
-            className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+            title="Synchronize latest SOPs with IndexedDB & Cloud"
+            className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold transition flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
           >
-            <RotateCw className={`w-3.5 h-3.5 text-blue-600 ${isSyncing ? 'animate-spin' : ''}`} />
+            <RotateCw className={`w-3.5 h-3.5 text-blue-500 ${isSyncing ? 'animate-spin' : ''}`} />
             <span className="hidden md:inline">{isSyncing ? 'Syncing...' : 'Sync Data'}</span>
           </button>
 
-          {/* Notifications Bell */}
+          {/* Notifications Dropdown */}
           <div className="relative" ref={notifRef}>
             <button
               type="button"
               onClick={() => setIsNotifOpen(!isNotifOpen)}
-              className="relative p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition shadow-xs cursor-pointer"
+              className="relative p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition shadow-2xs cursor-pointer"
               title="Notifications"
             >
-              <Bell className="w-4 h-4 text-slate-700" />
+              <Bell className="w-4 h-4 text-slate-600" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-600 text-white text-[10px] font-mono font-bold rounded-full flex items-center justify-center px-1 shadow-sm animate-pulse">
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-bounce">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
             </button>
 
-            {/* Notifications Dropdown */}
+            {/* Notification Dropdown Menu */}
             {isNotifOpen && (
               <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden text-xs">
-                <div className="p-3 bg-slate-900 text-white flex items-center justify-between">
-                  <div className="font-bold flex items-center gap-2">
-                    <Bell className="w-4 h-4 text-blue-400" />
-                    <span>Notifications &amp; Tasks</span>
+                <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-800">Notifications</span>
+                    <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {unreadCount} unread
+                    </span>
                   </div>
                   {unreadCount > 0 && (
                     <button
                       type="button"
                       onClick={handleMarkAllRead}
-                      className="text-[11px] text-blue-300 hover:text-white flex items-center gap-1 cursor-pointer font-medium"
+                      className="text-[11px] text-blue-600 hover:text-blue-700 font-semibold cursor-pointer"
                     >
-                      <CheckCheck className="w-3.5 h-3.5" />
-                      <span>Mark all read</span>
+                      Mark all as read
                     </button>
                   )}
                 </div>
 
-                <div className="flex border-b border-slate-200 bg-slate-50">
+                <div className="flex border-b border-slate-200 bg-slate-50/50">
                   <button
                     type="button"
                     onClick={() => setNotifTab('unread')}
-                    className={`flex-1 py-1.5 font-bold text-center border-b-2 transition ${
+                    className={`flex-1 py-1.5 text-center font-bold text-xs ${
                       notifTab === 'unread'
-                        ? 'border-blue-600 text-blue-600 bg-white'
-                        : 'border-transparent text-slate-500'
+                        ? 'border-b-2 border-blue-600 text-blue-600 bg-white'
+                        : 'text-slate-500'
                     }`}
                   >
                     Unread ({unreadCount})
@@ -212,48 +189,53 @@ export const TopExecutiveHeader: React.FC<TopExecutiveHeaderProps> = ({
                   <button
                     type="button"
                     onClick={() => setNotifTab('all')}
-                    className={`flex-1 py-1.5 font-bold text-center border-b-2 transition ${
+                    className={`flex-1 py-1.5 text-center font-bold text-xs ${
                       notifTab === 'all'
-                        ? 'border-blue-600 text-blue-600 bg-white'
-                        : 'border-transparent text-slate-500'
+                        ? 'border-b-2 border-blue-600 text-blue-600 bg-white'
+                        : 'text-slate-500'
                     }`}
                   >
                     All ({effectiveNotifications.length})
                   </button>
                 </div>
 
-                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
+                <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
                   {displayedNotifs.length === 0 ? (
                     <div className="p-6 text-center text-slate-400">
-                      No {notifTab === 'unread' ? 'unread' : ''} notifications at this moment.
+                      <CheckCheck className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                      <p className="font-medium">No notifications in this tab</p>
                     </div>
                   ) : (
-                    displayedNotifs.map((item) => (
+                    displayedNotifs.map((notif) => (
                       <div
-                        key={item.id}
+                        key={notif.id}
                         onClick={() => {
-                          handleMarkAsRead(item.id);
-                          if (onSelectSopById && item.sopId) {
-                            onSelectSopById(item.sopId);
+                          handleMarkAsRead(notif.id);
+                          if (notif.sopId && onSelectSopById) {
+                            onSelectSopById(notif.sopId);
                             setIsNotifOpen(false);
                           }
                         }}
-                        className={`p-3 transition hover:bg-blue-50/50 cursor-pointer ${
-                          !item.isRead ? 'bg-blue-50/30' : ''
+                        className={`p-3 transition cursor-pointer hover:bg-slate-50 ${
+                          !notif.isRead ? 'bg-blue-50/50 font-medium' : ''
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div className="font-bold text-slate-800 text-[11.5px] truncate">
-                            {item.sopTitle}
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-slate-900">{notif.sopTitle}</span>
+                              {!notif.isRead && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-600 leading-snug">{notif.message}</p>
+                            <span className="text-[10px] text-slate-400 font-mono block">
+                              {new Date(notif.timestamp).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
                           </div>
-                          {!item.isRead && (
-                            <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0 mt-1" />
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-2">{item.message}</p>
-                        <div className="mt-1 flex items-center justify-between text-[10px] text-slate-400">
-                          <span>{item.senderName} ({item.senderRole})</span>
-                          <span>{new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                       </div>
                     ))
@@ -263,57 +245,43 @@ export const TopExecutiveHeader: React.FC<TopExecutiveHeaderProps> = ({
             )}
           </div>
 
-          {/* User Role Badge & Switcher */}
+          {/* User Role Badge / Login Button */}
           {currentUser ? (
-            <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-blue-100 border border-blue-200 text-blue-800 flex items-center justify-center font-bold text-xs shadow-xs">
-                  {currentUser.username.substring(0, 2).toUpperCase()}
-                </div>
-                <div className="hidden sm:block text-left">
-                  <div className="text-xs font-bold text-slate-900 leading-tight">
-                    {currentUser.name}
-                  </div>
-                  <div className="text-[10px] text-slate-500 font-medium">
-                    {currentUser.role === 'admin'
-                      ? 'Super Admin'
-                      : currentUser.role === 'approved_by'
-                      ? 'Process HOD'
-                      : currentUser.role === 'checked_by'
-                      ? 'Section In-Charge'
-                      : 'Process Engineer'}
-                  </div>
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 pl-2.5 rounded-xl border border-slate-200">
+              <div className="text-left leading-none">
+                <div className="text-[11px] font-bold text-slate-800">{currentUser.name}</div>
+                <div className="text-[9.5px] font-mono font-semibold text-slate-500 uppercase mt-0.5">
+                  {currentUser.role}
                 </div>
               </div>
-
               <button
                 type="button"
                 onClick={onLogout}
-                className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
-                title="Switch User / Sign Out"
+                title="Log Out"
+                className="p-1 rounded-lg text-slate-400 hover:text-red-600 hover:bg-white transition cursor-pointer"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3.5 h-3.5" />
               </button>
             </div>
           ) : (
             <button
               type="button"
               onClick={onOpenLogin}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
               <LogIn className="w-3.5 h-3.5" />
-              <span>Sign In</span>
+              <span>Login</span>
             </button>
           )}
 
-          {/* Generate Fast SOP Action Button (Red styling matching ac-process-monthly-report) */}
+          {/* Red Fast Action Button (+ New SOP) - Exact ac-process-monthly-report style */}
           <button
             type="button"
             onClick={onFastCreateSop}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#DC2626] hover:bg-red-700 text-xs font-bold text-white shadow-sm transition cursor-pointer"
-            title="Create a new SOP"
+            className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-[#DC2626] hover:bg-red-700 text-xs font-bold text-white shadow-xs transition cursor-pointer"
+            title="Create New SOP Document"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">New SOP</span>
           </button>
         </div>
