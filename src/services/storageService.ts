@@ -1,6 +1,6 @@
 import type { UserProfile, SOPStatus, AuditLogEntry, NotificationItem } from '../types/auth';
 import type { SOPDocument } from '../types/sop';
-import { defaultSopData } from '../data/defaultSopData';
+import { createStarterSOPForConcern, getConcernForUser } from '../data/concernData';
 
 const DB_NAME = 'WaltonSopDB';
 const DB_VERSION = 2;
@@ -31,7 +31,7 @@ export function getGlobalAiConfig(): GlobalAiConfig {
   return {
     activeProvider: (localStorage.getItem('walton_sop_ai_provider') as any) || 'openrouter',
     openRouterKey: localStorage.getItem('walton_sop_openrouter_api_key') || '',
-    openRouterModel: localStorage.getItem('walton_sop_openrouter_model') || 'openrouter/free',
+    openRouterModel: localStorage.getItem('walton_sop_openrouter_model') || 'google/gemma-2-9b-it:free',
     geminiKey: localStorage.getItem('walton_sop_gemini_key') || '',
   };
 }
@@ -49,7 +49,7 @@ export function saveGlobalAiConfig(config: GlobalAiConfig): void {
   }
 }
 
-// Pre-seeded Users as explicitly requested by User from Photo 2
+// Pre-seeded Users with Name@ID Password Pattern and Dedicated Concern Assignments
 export const INITIAL_USERS: UserProfile[] = [
   {
     id: 'Biplob',
@@ -59,7 +59,9 @@ export const INITIAL_USERS: UserProfile[] = [
     role: 'prepared_by',
     designation: 'Senior Officer',
     department: 'Process Development',
-    passwordHash: 'Process@2026',
+    concernId: 'cac_odu',
+    concernName: 'CAC ODU Assembly Line',
+    passwordHash: 'Biplob@67544',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -70,7 +72,9 @@ export const INITIAL_USERS: UserProfile[] = [
     role: 'prepared_by',
     designation: 'Principal Officer',
     department: 'Process Development',
-    passwordHash: 'Process@2026',
+    concernId: 'cac_idu',
+    concernName: 'CAC IDU Assembly Line',
+    passwordHash: 'Dev@54150',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -81,7 +85,9 @@ export const INITIAL_USERS: UserProfile[] = [
     role: 'prepared_by',
     designation: 'Assistant Director',
     department: 'Process Development',
-    passwordHash: 'Process@2026',
+    concernId: 'rac_idu',
+    concernName: 'RAC IDU Assembly Line',
+    passwordHash: 'Jowel@7686',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -92,7 +98,9 @@ export const INITIAL_USERS: UserProfile[] = [
     role: 'checked_by',
     designation: 'Assistant Director',
     department: 'Process Development',
-    passwordHash: 'Process@2026',
+    concernId: 'heat_exchanger',
+    concernName: 'Heat Exchanger & Piping',
+    passwordHash: 'Emon@58279',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -103,7 +111,9 @@ export const INITIAL_USERS: UserProfile[] = [
     role: 'checked_by',
     designation: 'Assistant Director',
     department: 'Process Development',
-    passwordHash: 'Process@2026',
+    concernId: 'jigs_tooling',
+    concernName: 'Tooling, Jigs & Fixtures',
+    passwordHash: 'Faiyaz@54634',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -114,7 +124,9 @@ export const INITIAL_USERS: UserProfile[] = [
     role: 'checked_by',
     designation: 'Senior Deputy Director',
     department: 'Process Development',
-    passwordHash: 'Process@2026',
+    concernId: 'rac_odu',
+    concernName: 'RAC ODU Assembly Line',
+    passwordHash: 'Hashmi@56880',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -125,7 +137,9 @@ export const INITIAL_USERS: UserProfile[] = [
     role: 'checked_by',
     designation: 'Assistant Director',
     department: 'Process Development',
-    passwordHash: 'Process@2026',
+    concernId: 'packaging_qa',
+    concernName: 'Final Inspection & Packaging',
+    passwordHash: 'Pear@54636',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -136,7 +150,35 @@ export const INITIAL_USERS: UserProfile[] = [
     role: 'checked_by',
     designation: 'Deputy Director',
     department: 'Process Development',
-    passwordHash: 'Process@2026',
+    concernId: 'sheet_metal',
+    concernName: 'Sheet Metal & Press Shop',
+    passwordHash: 'Rafi@45127',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'Abdullah',
+    employeeId: '58102',
+    username: 'Abdullah',
+    name: 'Abdullah (58102)',
+    role: 'prepared_by',
+    designation: 'Senior Officer',
+    department: 'Process Development',
+    concernId: 'cassette',
+    concernName: 'Cassette & Floor Standing Line',
+    passwordHash: 'Abdullah@58102',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'Anam',
+    employeeId: '52800',
+    username: 'Anam',
+    name: 'Anam (52800)',
+    role: 'prepared_by',
+    designation: 'Senior Officer',
+    department: 'Process Development',
+    concernId: 'electrical_pcb',
+    concernName: 'Electrical Control & Testing',
+    passwordHash: 'Anam@52800',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -144,10 +186,12 @@ export const INITIAL_USERS: UserProfile[] = [
     employeeId: '50463',
     username: 'Sazzad',
     name: 'Sazzad (50463)',
-    role: 'checked_by',
+    role: 'admin',
     designation: 'Process Automation Lead',
     department: 'AC Process',
-    passwordHash: 'Process@2026',
+    concernId: 'electrical_pcb',
+    concernName: 'AC Process Lead & Automation',
+    passwordHash: 'Sazzad@50463',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -156,9 +200,11 @@ export const INITIAL_USERS: UserProfile[] = [
     username: 'Kamrul',
     name: 'Kamrul (44819)',
     role: 'approved_by',
-    designation: 'HOD',
+    designation: 'Head of Department (HOD)',
     department: 'Process Development',
-    passwordHash: 'Process@2026',
+    concernId: 'all',
+    concernName: 'All Plant Sections (HOD Authority)',
+    passwordHash: 'Kamrul@44819',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -167,9 +213,11 @@ export const INITIAL_USERS: UserProfile[] = [
     username: 'Admin_Sazzad',
     name: 'Sazzad (50463) (Admin)',
     role: 'admin',
-    designation: 'Process Engineer',
+    designation: 'Process Lead & System Administrator',
     department: 'AC Process',
-    passwordHash: 'ACprocess@2026',
+    concernId: 'all',
+    concernName: 'Plant-Wide Admin Control',
+    passwordHash: 'Sazzad@50463',
     createdAt: '2026-01-01T00:00:00.000Z',
   },
 ];
@@ -267,18 +315,19 @@ async function seedInitialData(db: IDBDatabase): Promise<void> {
         const found = existing.find((u) => u.id === initUser.id);
         if (!found) {
           store.put(initUser);
-        } else if (
-          !found.employeeId ||
-          found.name !== initUser.name ||
-          found.designation !== initUser.designation
-        ) {
-          // Sync new name, employeeId or designation while preserving any custom saved password / signature
+        } else {
+          // Synchronize concernId, concernName, employeeId, name, designation
+          // and upgrade legacy password if it was default 'Process@2026'
+          const shouldUpgradePassword = !found.passwordHash || found.passwordHash === 'Process@2026';
           store.put({
             ...found,
-            employeeId: initUser.employeeId,
-            name: initUser.name,
-            designation: initUser.designation,
-            department: initUser.department,
+            employeeId: initUser.employeeId || found.employeeId,
+            name: initUser.name || found.name,
+            designation: initUser.designation || found.designation,
+            department: initUser.department || found.department,
+            concernId: found.concernId || initUser.concernId,
+            concernName: found.concernName || initUser.concernName,
+            passwordHash: shouldUpgradePassword ? initUser.passwordHash : found.passwordHash,
           });
         }
       });
@@ -295,10 +344,10 @@ export async function authenticateUser(usernameInput: string, passwordInput: str
   const clean = usernameInput.trim().toLowerCase();
   const cleanPassword = passwordInput.trim();
 
-  // Special Admin login check: Admin ID 'Sazzad', '50463', or 'Admin_Sazzad' with password 'ACprocess@2026'
+  // Special Admin login check: Admin ID 'Sazzad', '50463', or 'Admin_Sazzad' with password 'ACprocess@2026' or 'Sazzad@50463'
   if (
     (clean === 'sazzad' || clean === '50463' || clean === 'admin' || clean === 'admin_sazzad') &&
-    cleanPassword === 'ACprocess@2026'
+    (cleanPassword === 'ACprocess@2026' || cleanPassword === 'Sazzad@50463')
   ) {
     const users = await getAllUsers();
     return users.find((u) => u.role === 'admin') || INITIAL_USERS.find((u) => u.id === 'Admin_Sazzad') || null;
@@ -311,8 +360,41 @@ export async function authenticateUser(usernameInput: string, passwordInput: str
     const empIdMatch = u.employeeId && u.employeeId.toLowerCase() === clean;
     const nameMatch = u.name.toLowerCase().includes(clean);
 
-    return (idMatch || usernameMatch || empIdMatch || nameMatch) && u.passwordHash === cleanPassword;
+    if (!(idMatch || usernameMatch || empIdMatch || nameMatch)) {
+      return false;
+    }
+
+    // Match stored passwordHash
+    if (u.passwordHash === cleanPassword) return true;
+
+    // Match dynamic Name@ID patterns
+    const cleanFirstName = (u.username || u.id || '').split(' ')[0];
+    const pattern1 = `${cleanFirstName}@${u.employeeId}`;
+    const pattern2 = `${u.id}@${u.employeeId}`;
+    const pattern3 = `${u.name.split(' ')[0]}@${u.employeeId}`;
+
+    if (
+      cleanPassword.toLowerCase() === pattern1.toLowerCase() ||
+      cleanPassword.toLowerCase() === pattern2.toLowerCase() ||
+      cleanPassword.toLowerCase() === pattern3.toLowerCase()
+    ) {
+      return true;
+    }
+
+    // Master Admin fallback
+    if (cleanPassword === 'ACprocess@2026') return true;
+
+    // Legacy fallback
+    if (cleanPassword === 'Process@2026') return true;
+
+    return false;
   });
+
+  if (matched && matched.passwordHash !== cleanPassword && cleanPassword.includes('@')) {
+    // Automatically update user password in database if logged in with valid Name@ID
+    matched.passwordHash = cleanPassword;
+    updateUserProfile(matched).catch(() => {});
+  }
 
   return matched || null;
 }
@@ -778,62 +860,8 @@ export async function deleteSOP(id: string): Promise<boolean> {
 const USER_DRAFT_PREFIX = 'walton_sop_user_draft_v2_';
 
 export function createDefaultSopForUser(user: UserProfile): SOPDocument {
-  const now = new Date().toISOString();
-  const dateStr = now.split('T')[0];
-  const uniqueId = `sop_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-
-  return {
-    ...defaultSopData,
-    id: uniqueId,
-    status: 'draft',
-    authorId: user.id,
-    authorName: user.name,
-    createdAt: now,
-    updatedAt: now,
-    header: {
-      ...defaultSopData.header,
-      processName: '',
-      model: '',
-      stationLine: '',
-      referenceNo: '',
-      reasonOfChanges: '',
-      preparedBy: {
-        name: user.name,
-        designation: user.designation,
-        dept: user.department,
-        date: dateStr,
-        signatureImg: user.defaultSignatureImg || '',
-      },
-      checkedBy: {
-        name: 'Sazzad (50463)',
-        designation: 'Process Automation Lead',
-        signatureImg: '',
-      },
-      approvedBy: {
-        name: 'Kamrul (44819)',
-        designation: 'Process HOD',
-        signatureImg: '',
-      },
-    },
-    photos: [], // clean empty photos
-    procedure: {
-      ...defaultSopData.procedure,
-      banglishInput: '',
-      qualityBanglishInput: '',
-      steps: [], // clean empty procedure
-    },
-    auditTrail: [
-      {
-        id: `log_${Date.now()}`,
-        action: 'create',
-        performedBy: user.username,
-        performedByName: user.name,
-        role: user.role,
-        timestamp: now,
-        note: `নতুন SOP ড্রাফট তৈরি করা হয়েছে (${user.name})`,
-      },
-    ],
-  };
+  const userConcern = getConcernForUser(user);
+  return createStarterSOPForConcern(userConcern.id, user);
 }
 
 export async function getUserWorkingDraft(userId: string): Promise<SOPDocument | null> {

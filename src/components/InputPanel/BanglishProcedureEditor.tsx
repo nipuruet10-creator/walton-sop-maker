@@ -19,6 +19,7 @@ interface BanglishProcedureEditorProps {
   onFontSizeChange?: (size: 'auto' | 'compact' | 'normal' | 'large' | 'xlarge') => void;
   qualityFontSize?: 'auto' | 'compact' | 'normal' | 'large';
   onQualityFontSizeChange?: (size: 'auto' | 'compact' | 'normal' | 'large') => void;
+  lastUsedEngine?: string;
 }
 
 export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = ({
@@ -30,12 +31,13 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
   isGeneratingQuality = false,
   hasApiKey,
   activeProvider = 'openrouter',
-  activeModel = 'openrouter/free',
+  activeModel = 'google/gemma-2-9b-it:free',
   onOpenAiModal,
   stepFontSize = 'auto',
   onFontSizeChange,
   qualityFontSize = 'auto',
   onQualityFontSizeChange,
+  lastUsedEngine,
 }) => {
   const [autoConvert, setAutoConvert] = useState<boolean>(false);
   const debounceTimerRef = useRef<any>(null);
@@ -123,6 +125,63 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
 
   return (
     <div className="space-y-4 text-xs">
+      {/* 1. Real-time AI Integration Status Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-blue-950 border border-blue-800/60 rounded-xl p-3 shadow-md">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <div className="relative flex items-center justify-center shrink-0">
+              <span className={`w-2.5 h-2.5 rounded-full ${hasApiKey ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+              <span className={`absolute w-4 h-4 rounded-full opacity-75 animate-ping ${hasApiKey ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-white text-[12px] flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  {hasApiKey ? 'AI Connected: Online AI Active' : 'Smart Factory AI Engine: Active'}
+                </span>
+                <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-medium ${
+                  hasApiKey
+                    ? 'bg-blue-900/80 text-blue-200 border border-blue-600/50'
+                    : 'bg-amber-950/80 text-amber-300 border border-amber-600/50'
+                }`}>
+                  {hasApiKey
+                    ? activeProvider === 'openrouter'
+                      ? `${activeModel.replace(':free', '').split('/').pop()}`
+                      : 'Gemini 1.5 Flash'
+                    : 'Built-in Rule & Phonetic Engine (0ms)'}
+                </span>
+              </div>
+              <p className="text-[10.5px] text-slate-300 mt-0.5 leading-tight">
+                {hasApiKey
+                  ? 'AI translates notes into natural, fluent factory Bengali. Only acronyms (QR, WQMS, AC) stay in English.'
+                  : 'Translates 100% of notes into simple, natural factory Bengali with zero raw English words.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 shrink-0">
+            {onOpenAiModal && (
+              <button
+                type="button"
+                onClick={onOpenAiModal}
+                className="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[11px] px-2.5 py-1 rounded-lg transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                title="Configure or switch AI model"
+              >
+                <Cpu className="w-3.5 h-3.5 text-white" />
+                <span>{hasApiKey ? 'Change Model' : 'Connect Cloud AI'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {lastUsedEngine && (
+          <div className="mt-2 pt-2 border-t border-slate-800 text-[10.5px] text-emerald-300 flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Last translated by: <strong>{lastUsedEngine}</strong></span>
+          </div>
+        )}
+      </div>
+
       {/* Banglish Input Box */}
       <div className="bg-slate-900 text-slate-100 p-3.5 rounded-xl border border-slate-800 shadow-md space-y-2.5">
         <div className="flex items-center justify-between">
@@ -132,32 +191,6 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
           </label>
 
           <div className="flex items-center gap-1.5">
-            {onOpenAiModal ? (
-              <button
-                type="button"
-                onClick={onOpenAiModal}
-                className={`text-[10px] px-2 py-0.5 rounded cursor-pointer transition flex items-center gap-1 ${
-                  hasApiKey
-                    ? 'bg-blue-900/60 text-blue-300 border border-blue-700/60 hover:bg-blue-800/60'
-                    : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
-                }`}
-                title="Configure AI Model / OpenRouter API"
-              >
-                <Cpu className="w-2.5 h-2.5 text-blue-400" />
-                <span>
-                  {hasApiKey
-                    ? activeProvider === 'openrouter'
-                      ? `AI: ${activeModel.replace(':free', '').split('/').pop()}`
-                      : 'Gemini AI'
-                    : 'Central AI Config'}
-                </span>
-              </button>
-            ) : (
-              <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
-                {hasApiKey ? 'AI Ready' : 'Offline Engine'}
-              </span>
-            )}
-
             {/* Auto Convert Toggle */}
             <button
               type="button"
@@ -175,14 +208,27 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
           </div>
         </div>
 
+        {/* Translation Language Guideline Note */}
+        <div className="bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[10.5px] text-slate-300 flex items-center gap-2">
+          <span className="text-amber-400 font-bold">📌 নিয়ম:</span>
+          <span>সহজ কারখানা বাংলা হবে। শুধু ২-১টি প্রয়োজনীয় এক্রোনিম (QR, WQMS, AC) ইংরেজি থাকবে, বাকি সব শুদ্ধ বাংলায় রূপান্তর হবে।</span>
+        </div>
+
+        {isGenerating && (
+          <div className="bg-blue-900/40 border border-blue-600/50 text-blue-200 rounded-lg p-2.5 flex items-center gap-2 text-[11px] animate-pulse">
+            <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
+            <span>AI অনুবাদ চলছে: সহজ ও সাবলীল কারখানা বাংলায় রূপান্তর করা হচ্ছে...</span>
+          </div>
+        )}
+
         <textarea
           value={procedure.banglishInput}
           onChange={(e) => handleBanglishChange(e.target.value)}
           rows={6}
           placeholder={`Enter Banglish or English procedure notes here... e.g.:
-1) packaging tape dispenser theke 200 mm bopp tape kete nite hobe.
-2) cartoon er marked sthane tepti boshate hobe (chobi 1).
-3) indoor cartoon er every ta taping jaygay ek layer BOPP tape use korte hobe (chobi 2)...`}
+1) Line e unit asar por scanner diye scan korte hobe. thik vabe jeno scan kore complete korte pare.
+2) compressor bosate hobe thik vabe.
+3) smart QR code sticker indoor unit e lagate hobe (chobi 1)...`}
           className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 placeholder:text-slate-500 font-mono focus:outline-none focus:border-blue-500 resize-y leading-relaxed"
         />
 
@@ -199,7 +245,7 @@ export const BanglishProcedureEditor: React.FC<BanglishProcedureEditorProps> = (
             className="flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:from-slate-700 disabled:to-slate-700 text-white px-3.5 py-1.5 rounded-lg font-bold transition cursor-pointer disabled:cursor-not-allowed shadow-md text-xs shrink-0"
           >
             <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin text-amber-300' : 'text-amber-300'}`} />
-            <span>{isGenerating ? 'AI Translating...' : 'AI Generate (Bengali SOP)'}</span>
+            <span>{isGenerating ? 'AI Translating...' : 'AI Generate (Easy Bengali SOP)'}</span>
           </button>
         </div>
       </div>

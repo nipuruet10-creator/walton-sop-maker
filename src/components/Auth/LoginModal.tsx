@@ -170,9 +170,42 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             <span>{isSubmitting ? 'Authenticating...' : 'Sign In'}</span>
           </button>
 
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-400 text-center">
+          {/* Quick Account Switcher for Engineers & HOD */}
+          <div className="pt-3 border-t border-slate-100 space-y-2">
+            <div className="flex items-center justify-between text-[10.5px] font-bold text-slate-500 uppercase tracking-wider">
+              <span>Quick Role Switcher (Password: Name@ID)</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+              {[
+                { name: 'Biplob', id: '67544', role: 'CAC ODU Line' },
+                { name: 'Dev', id: '54150', role: 'CAC IDU Line' },
+                { name: 'Jowel', id: '7686', role: 'RAC IDU Line' },
+                { name: 'Rafi', id: '45127', role: 'Sheet Metal' },
+                { name: 'Emon', id: '58279', role: 'HEX & Piping' },
+                { name: 'Kamrul', id: '44819', role: 'Process HOD' },
+              ].map((acc) => (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => {
+                    setUsername(acc.name);
+                    setPassword(`${acc.name}@${acc.id}`);
+                  }}
+                  className="p-1.5 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-blue-50 hover:border-blue-300 text-left transition cursor-pointer"
+                >
+                  <div className="font-bold text-slate-800 text-[10.5px] truncate">
+                    {acc.name} ({acc.id})
+                  </div>
+                  <div className="text-[9.5px] text-slate-400 truncate">{acc.role}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center justify-center gap-2 text-[10.5px] text-slate-400 text-center">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Walton Process Development Enterprise System</span>
+            <span>Walton Process Development Enterprise System &bull; Version 2.0</span>
           </div>
         </form>
       </div>

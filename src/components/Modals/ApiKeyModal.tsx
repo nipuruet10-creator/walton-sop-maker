@@ -34,7 +34,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
 }) => {
   const [provider, setProvider] = useState<'openrouter' | 'gemini'>(activeProvider);
   const [orKey, setOrKey] = useState(openRouterKey);
-  const [orModel, setOrModel] = useState(openRouterModel || 'openrouter/free');
+  const [orModel, setOrModel] = useState(openRouterModel || 'google/gemma-2-9b-it:free');
   const [gemKey, setGemKey] = useState(geminiKey);
   const [showKey, setShowKey] = useState(false);
 

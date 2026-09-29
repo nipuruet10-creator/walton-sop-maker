@@ -13,6 +13,38 @@ const phraseDictionary: [RegExp, string | ReplacementFn][] = [
   // Photo reference patterns
   [/\(?\b(?:chobi|pic|photo|figure|chitra|citro|ছবি)[-_\s]*([0-9]+)\b\)?/gi, (_: string, n: string) => `(চিত্র-${toBengaliNumber(parseInt(n, 10))})`],
 
+  // Conversational translation request clauses
+  [/\b(?:ami|amra)\s+(?:valo|bhalo)\s*(?:vabe|bhabe|babe|vhabe)\s*(?:english|ingreji)\s*e\s*(?:dile|likhle)\s*(?:seta|sheta|ta)?\s*(?:bangla|banglae|banglate)\s*(?:te\s*)?(?:diba|diben|dite\s*hobe|hobe)\b/gi, 'আমি ভালোভাবে ইংরেজিতে দিলে তা বাংলায় দিতে হবে'],
+  [/\b(?:english|ingreji)\s*e\s*(?:dile|likhle)\s*(?:seta|sheta|ta)?\s*(?:bangla|banglae|banglate)\s*(?:te\s*)?(?:diba|diben|dite\s*hobe|hobe)\b/gi, 'ইংরেজিতে দিলে তা বাংলায় দিতে হবে'],
+  [/\b(?:bangla|banglae|banglate)\s*(?:te\s*)?(?:diba|diben|dite\s*hobe)\b/gi, 'বাংলায় দিতে হবে'],
+
+  // Multi-word factory assembly & scanning procedures
+  [/\b(?:line\s*e|line-e)\s*(?:unit|indoor\s*unit|indoor|cac\s*unit)\s*(?:asar|ashar|aashar)\s*(?:por|pore)\b/gi, 'লাইনে ইউনিট আসার পর'],
+  [/\b(?:line\s*e|line-e)\s*(?:asar|ashar|aashar)\s*(?:por|pore)\b/gi, 'লাইনে আসার পর'],
+  [/\b(?:unit|indoor\s*unit|cac\s*unit)\s*(?:asar|ashar|aashar)\s*(?:por|pore)\b/gi, 'ইউনিট আসার পর'],
+  [/\b(?:asar|ashar|aashar)\s*(?:por|pore)\b/gi, 'আসার পর'],
+  [/\b(?:scanner\s*diye|scanner\s*dia|scanner-er\s*sahajje|scanner-er\s*sahajjye)\s*(?:scan|scanning)\s*(?:korte|kore|korun)\s*hobe\b/gi, 'স্ক্যানার দিয়ে স্ক্যান করতে হবে'],
+  [/\b(?:scanner\s*diye|scanner\s*dia|scanner-er\s*sahajje)\s*(?:scan|scanning)\s*kore\b/gi, 'স্ক্যানার দিয়ে স্ক্যান করে'],
+  [/\b(?:scanner\s*diye|scanner\s*dia)\b/gi, 'স্ক্যানার দিয়ে'],
+  [/\b(?:thik\s*(?:vabe|bhabe|babe)|sothik\s*(?:vabe|bhabe|babe))\s*jeno\s*(?:scan|scanning)\s*kore\s*(?:complete|finish|shesh)\s*(?:korte\s*pare|kora\s*jay|hobe)\b/gi, 'সঠিকভাবে যেন স্ক্যান সম্পন্ন করা যায়'],
+  [/\b(?:thik\s*(?:vabe|bhabe|babe)|sothik\s*(?:vabe|bhabe|babe))\s*jeno\s*(?:scan|scanning)\s*(?:complete|finish|shesh)\s*(?:korte\s*pare|kora\s*jay|hobe)\b/gi, 'সঠিকভাবে যেন স্ক্যান সম্পন্ন হয়'],
+  [/\b(?:scan|scanning)\s*kore\s*(?:complete|finish)\s*(?:korte\s*pare|kora\s*jay)\b/gi, 'স্ক্যান সম্পন্ন করতে পারে'],
+  [/\b(?:complete\s*korte\s*pare|complete\s*kora\s*jay)\b/gi, 'সম্পন্ন করতে পারে'],
+  [/\b(?:complete\s*korte\s*hobe|complete\s*kora\s*hobe)\b/gi, 'সম্পন্ন করতে হবে'],
+  [/\b(?:complete\s*kore|complete\s*korun)\b/gi, 'সম্পন্ন করে'],
+  [/\b(?:scan|scanning)\s*korte\s*hobe\b/gi, 'স্ক্যান করতে হবে'],
+  [/\b(?:scan|scanning)\s*kore\b/gi, 'স্ক্যান করে'],
+  [/\b(?:scan|scanning)\s*korun\b/gi, 'স্ক্যান করুন'],
+  [/\b(?:jeno\s*scan\s*kore|jeno\s*scanning\s*kore)\b/gi, 'যেন স্ক্যান করে'],
+
+  // Compressor & parts positioning
+  [/\b(?:compressor|compressorti)\s*(?:bosate|boshate|lagate|bosiye|boshiye)\s*hobe\s*(?:thik\s*(?:vabe|bhabe|babe)|sothik\s*(?:vabe|bhabe|babe))\b/gi, 'কম্প্রেসর সঠিকভাবে বসাতে হবে'],
+  [/\b(?:compressor|compressorti)\s*(?:thik\s*(?:vabe|bhabe|babe)|sothik\s*(?:vabe|bhabe|babe))\s*(?:bosate|boshate|lagate)\s*hobe\b/gi, 'কম্প্রেসর সঠিকভাবে বসাতে হবে'],
+  [/\b(?:compressor|compressorti)\s*(?:bosate|boshate|lagate)\s*hobe\b/gi, 'কম্প্রেসর বসাতে হবে'],
+  [/\b(?:bosate|boshate)\s*hobe\s*(?:thik\s*(?:vabe|bhabe|babe)|sothik\s*(?:vabe|bhabe|babe))\b/gi, 'সঠিকভাবে বসাতে হবে'],
+  [/\b(?:bosate|boshate)\s*hobe\b/gi, 'বসাতে হবে'],
+  [/\b(?:bosiye|boshiye)\s*(?:nite|dite)\s*hobe\b/gi, 'বসিয়ে নিতে হবে'],
+
   // Equipment, Factory Terms & Industrial objects (clean Bengali phonetic transliteration + uppercase acronyms)
   [/\b(?:smart\s*qr\s*code\s*sticker|smart\s*qr\s*sticker)\b/gi, 'স্মার্ট QR কোড স্টিকার'],
   [/\b(?:smart\s*qr\s*code\s*scanner)\b/gi, 'স্মার্ট QR কোড স্ক্যানার'],
@@ -80,7 +112,9 @@ const phraseDictionary: [RegExp, string | ReplacementFn][] = [
   [/\b(?:shabdhan\s*e|shabdhane|carefully)\b/gi, 'সাবধানে'],
   [/\b(?:dhire\s*dhire|slowly)\b/gi, 'ধীরে ধীরে'],
   [/\b(?:druto|quickly|fast)\b/gi, 'দ্রুত'],
-  [/\b(?:shokto\s*kore|tight\s*kore|tightly)\b/gi, 'দৃঢ়ভাবে'],
+  [/\b(?:tight\s*(?:vabe|bhabe|babe)|tightly|shokto\s*(?:vabe|bhabe|babe))\b/gi, 'দৃঢ়ভাবে'],
+  [/\b(?:shokto\s*kore|tight\s*kore)\b/gi, 'দৃঢ়ভাবে'],
+  [/\b(?:loose\s*(?:vabe|bhabe|babe)|loosely)\b/gi, 'আলগাভাবে'],
   [/\b(?:lagay\s*nite\s*hobe|lagaye\s*nite\s*hobe|lagiye\s*nite\s*hobe)\b/gi, 'লাগিয়ে নিতে হবে'],
   [/\b(?:lagay\s*dite\s*hobe|lagaye\s*dite\s*hobe|lagiye\s*dite\s*hobe)\b/gi, 'লাগিয়ে দিতে হবে'],
   [/\b(?:lagate\s*hobe|lagano\s*hobe)\b/gi, 'লাগাতে হবে'],
@@ -152,6 +186,77 @@ const phraseDictionary: [RegExp, string | ReplacementFn][] = [
 
 // 2. Comprehensive Word-Level Dictionary (Banglish & English words mapped to formal Bengali)
 const wordMap: Record<string, string> = {
+  // Conversational Pronouns & Actions
+  ami: 'আমি',
+  amra: 'আমরা',
+  tumi: 'তুমি',
+  tomra: 'তোমরা',
+  apni: 'আপনি',
+  apnara: 'আপনারা',
+  amar: 'আমার',
+  amader: 'আমাদের',
+  tomar: 'তোমার',
+  apnar: 'আপনার',
+  english: 'ইংরেজি',
+  ingreji: 'ইংরেজি',
+  bangla: 'বাংলা',
+  banglae: 'বাংলায়',
+  banglate: 'বাংলাতে',
+  dile: 'দিলে',
+  diba: 'দিতে হবে',
+  dibe: 'দিবে',
+  diben: 'দিবেন',
+  dibo: 'দিবো',
+  asar: 'আসার',
+  ashar: 'আসার',
+  aashar: 'আসার',
+  ashe: 'আসে',
+  asle: 'আসলে',
+  ashle: 'আসলে',
+  por: 'পর',
+  pore: 'পরে',
+  complete: 'সম্পন্ন',
+  completed: 'সম্পন্ন',
+  pare: 'পারে',
+  parbe: 'পারবে',
+  parben: 'পারবেন',
+
+  // Core Industrial Objects & Factory Nouns
+  unit: 'ইউনিট',
+  unite: 'ইউনিটে',
+  uniter: 'ইউনিটের',
+  units: 'ইউনিট',
+  unitgulo: 'ইউনিটগুলো',
+  compressor: 'কম্প্রেসর',
+  compressore: 'কম্প্রেসরে',
+  compressorer: 'কম্প্রেসরের',
+  compressorti: 'কম্প্রেসরটি',
+  compressors: 'কম্প্রেসর',
+  scanner: 'স্ক্যানার',
+  scannere: 'স্ক্যানারে',
+  scannerer: 'স্ক্যানারের',
+  scannerti: 'স্ক্যানারটি',
+  scanners: 'স্ক্যানার',
+  scan: 'স্ক্যান',
+  scanned: 'স্ক্যান',
+  scanning: 'স্ক্যানিং',
+  bosate: 'বসাতে',
+  boshate: 'বসাতে',
+  bosano: 'বসানো',
+  boshano: 'বসানো',
+  boshabo: 'বসাবো',
+  bosay: 'বসিয়ে',
+  boshiye: 'বসিয়ে',
+  bosiye: 'বসিয়ে',
+  tight: 'টাইট',
+  tightly: 'দৃঢ়ভাবে',
+  loose: 'আলগা',
+  loosely: 'আলগাভাবে',
+  light: 'লাইট',
+  right: 'সঠিক',
+  left: 'বাম',
+  weight: 'ওজন',
+
   // Verification, Clauses & Adverbs
   hosse: 'হচ্ছে',
   hosshe: 'হচ্ছে',
@@ -231,11 +336,6 @@ const wordMap: Record<string, string> = {
   lagate: 'লাগাতে',
   lagano: 'লাগানো',
   lagaba: 'লাগাবেন',
-  boshay: 'বসিয়ে',
-  boshiye: 'বসিয়ে',
-  boshate: 'বসাতে',
-  boshano: 'বসানো',
-  boshabo: 'বসাবো',
   kete: 'কেটে',
   katte: 'কাটতে',
   kata: 'কাটা',
@@ -244,7 +344,6 @@ const wordMap: Record<string, string> = {
   dite: 'দিতে',
   diye: 'দিয়ে',
   deya: 'দেওয়া',
-  dibo: 'দিবো',
   korte: 'করতে',
   kore: 'করে',
   kora: 'করা',
@@ -264,7 +363,6 @@ const wordMap: Record<string, string> = {
   dekhte: 'দেখতে',
   dekha: 'দেখা',
   dekhun: 'দেখুন',
-  pore: 'পরে',
   porte: 'পরতে',
   khule: 'খুলে',
   khulte: 'খুলতে',
@@ -353,9 +451,6 @@ const wordMap: Record<string, string> = {
   model: 'মডেল',
   modeler: 'মডেলের',
   smart: 'স্মার্ট',
-  scanning: 'স্ক্যানিং',
-  scanner: 'স্ক্যানার',
-  scan: 'স্ক্যান',
   barcode: 'বারকোড',
   barcodes: 'বারকোড',
   barcodeti: 'বারকোডটি',
@@ -472,33 +567,115 @@ const wordMap: Record<string, string> = {
   kg: 'কেজি',
 };
 
-// Preserved industrial terms that should never be phonetically mangled
+// Preserved industrial acronyms that stay in English uppercase
 const PRESERVED_INDUSTRIAL_TERMS: Record<string, string> = {
   qr: 'QR',
-  code: 'Code',
-  barcode: 'Barcode',
-  indoor: 'Indoor',
-  unit: 'Unit',
-  outdoor: 'Outdoor',
-  poly: 'Poly',
-  forma: 'Forma',
-  frame: 'Frame',
-  model: 'Model',
-  setup: 'Set Up',
-  scanner: 'Scanner',
-  scan: 'স্ক্যান',
+  wqms: 'WQMS',
   eservice: 'E-Service',
   'e-service': 'E-Service',
-  wqms: 'WQMS',
+  ac: 'AC',
+  idu: 'IDU',
+  odu: 'ODU',
+  cac: 'CAC',
+  pcb: 'PCB',
   bopp: 'BOPP',
   pet: 'PET',
-  pcb: 'PCB',
-  jig: 'Jig',
-  sticker: 'Sticker',
-  dispenser: 'ডিসপেনসার',
-  smart: 'Smart',
-  process: 'Process',
+  btu: 'BTU',
+  sl: 'SL',
+  ok: 'OK',
+  led: 'LED',
+  lcd: 'LCD',
+  usb: 'USB',
 };
+
+/**
+ * Phonetic Avro-style transliteration for arbitrary Banglish syllables
+ * Guarantees zero raw Latin words leak into the final Bengali SOP output
+ */
+function transliterateAvroSyllable(raw: string): string {
+  if (!raw || /^[0-9\-_.,!?।()]+$/.test(raw)) return raw;
+
+  const lower = raw.toLowerCase();
+  if (wordMap[lower]) return wordMap[lower];
+  if (PRESERVED_INDUSTRIAL_TERMS[lower]) return PRESERVED_INDUSTRIAL_TERMS[lower];
+
+  let s = lower;
+
+  // 1. Multi-letter consonant clusters & digraphs
+  s = s
+    .replace(/kkh/g, 'ক্ষ')
+    .replace(/cch/g, 'চ্ছ')
+    .replace(/ggh/g, 'জ্ঞ')
+    .replace(/shk/g, 'ষ্ক')
+    .replace(/sht/g, 'ষ্ট')
+    .replace(/shth/g, 'ষ্ঠ')
+    .replace(/shn/g, 'ষ্ণ')
+    .replace(/shm/g, 'শ্ম')
+    .replace(/sk/g, 'স্ক')
+    .replace(/st/g, 'স্ট')
+    .replace(/sp/g, 'স্প')
+    .replace(/sm/g, 'স্ম')
+    .replace(/sn/g, 'স্ন')
+    .replace(/sl/g, 'স্ল')
+    .replace(/nt/g, 'ন্ট')
+    .replace(/nd/g, 'ন্ড')
+    .replace(/mp/g, 'ম্প')
+    .replace(/mb/g, 'ম্ব')
+    .replace(/ng/g, 'ং')
+    .replace(/kh/g, 'খ')
+    .replace(/gh/g, 'ঘ')
+    .replace(/ch/g, 'চ')
+    .replace(/chh/g, 'ছ')
+    .replace(/jh/g, 'ঝ')
+    .replace(/th/g, 'থ')
+    .replace(/dh/g, 'ধ')
+    .replace(/ph|f/g, 'ফ')
+    .replace(/bh|v/g, 'ভ')
+    .replace(/sh/g, 'শ')
+    .replace(/k/g, 'ক')
+    .replace(/g/g, 'গ')
+    .replace(/j|z/g, 'জ')
+    .replace(/t/g, 'ট')
+    .replace(/d/g, 'ড')
+    .replace(/n/g, 'ন')
+    .replace(/p/g, 'প')
+    .replace(/b/g, 'ব')
+    .replace(/m/g, 'ম')
+    .replace(/r/g, 'র')
+    .replace(/l/g, 'ল')
+    .replace(/s/g, 'স')
+    .replace(/h/g, 'হ')
+    .replace(/y/g, 'য়');
+
+  // 2. Vowel signs following consonants
+  s = s
+    .replace(/([\u0995-\u09B9])aa/g, '$1া')
+    .replace(/([\u0995-\u09B9])a/g, '$1া')
+    .replace(/([\u0995-\u09B9])ee/g, '$1ী')
+    .replace(/([\u0995-\u09B9])i/g, '$1ি')
+    .replace(/([\u0995-\u09B9])oo/g, '$1ূ')
+    .replace(/([\u0995-\u09B9])u/g, '$1ু')
+    .replace(/([\u0995-\u09B9])e/g, '$1ে')
+    .replace(/([\u0995-\u09B9])oi/g, '$1ৈ')
+    .replace(/([\u0995-\u09B9])o/g, '$1ো')
+    .replace(/([\u0995-\u09B9])ou/g, '$1ৌ');
+
+  // 3. Initial vowels
+  s = s
+    .replace(/\baa\b/g, 'আ')
+    .replace(/^aa/g, 'আ')
+    .replace(/^a/g, 'আ')
+    .replace(/^ee/g, 'ঈ')
+    .replace(/^i/g, 'ই')
+    .replace(/^oo/g, 'ঊ')
+    .replace(/^u/g, 'উ')
+    .replace(/^e/g, 'এ')
+    .replace(/^oi/g, 'ঐ')
+    .replace(/^o/g, 'ও')
+    .replace(/^ou/g, 'ঔ');
+
+  return s;
+}
 
 // 3. Fallback Phonetic Transliteration (Avro-like phonetic algorithm)
 function phoneticWord(w: string): string {
@@ -512,6 +689,9 @@ function phoneticWord(w: string): string {
   if (PRESERVED_INDUSTRIAL_TERMS[str]) {
     return PRESERVED_INDUSTRIAL_TERMS[str];
   }
+  if (wordMap[str]) {
+    return wordMap[str];
+  }
 
   // Basic Avro phonetic replacement rules
   const phoneticMap: [RegExp, string][] = [
@@ -520,7 +700,7 @@ function phoneticWord(w: string): string {
     [/vabe|bhabe|babe|vhabe/g, 'ভাবে'],
     [/lagay|lagaye|lagiye/g, 'লাগিয়ে'],
     [/lagate/g, 'লাগাতে'],
-    [/boshate|boshay|boshiye/g, 'বসাতে'],
+    [/boshate|boshay|boshiye|bosate|bosay|bosiye/g, 'বসাতে'],
     [/kete|katte/g, 'কেটে'],
     [/nite/g, 'নিতে'],
     [/dite/g, 'দিতে'],
@@ -569,6 +749,11 @@ function phoneticWord(w: string): string {
     if (pat.test(str)) {
       return str.replace(pat, rep);
     }
+  }
+
+  // Fallback to syllable transliterator if any latin characters remain
+  if (/[a-z]/i.test(str)) {
+    return transliterateAvroSyllable(str);
   }
 
   return str;
@@ -680,6 +865,16 @@ function cleanBanglaFormatting(text: string): string {
     .replace(/\bFrame\b/gi, 'ফ্রেম')
     .replace(/\bPoly\b/gi, 'পলি')
     .replace(/\bModel\b/gi, 'মডেল')
+    .replace(/\bUnit\b/gi, 'ইউনিট')
+    .replace(/\bUnits\b/gi, 'ইউনিট')
+    .replace(/\bLine\b/gi, 'লাইন')
+    .replace(/\bCompressor\b/gi, 'কম্প্রেসর')
+    .replace(/\bEnglish\b/gi, 'ইংরেজি')
+    .replace(/\bBangla\b/gi, 'বাংলা')
+    .replace(/\bComplete\b/gi, 'সম্পন্ন')
+    .replace(/\bProperly\b/gi, 'সঠিকভাবে')
+    .replace(/\bCorrectly\b/gi, 'সঠিকভাবে')
+    .replace(/\bCarefully\b/gi, 'সাবধানে')
     .replace(/\bselect\s+করতে\s+হবে\b/gi, 'সিলেক্ট করতে হবে')
     .replace(/\bselect\s+করলে\b/gi, 'সিলেক্ট করলে')
     .replace(/\bselect\s+হয়ে\s+যাবে\b/gi, 'সিলেক্ট হয়ে যাবে')
@@ -713,8 +908,18 @@ function cleanBanglaFormatting(text: string): string {
     .replace(/\bScrew\b/gi, 'স্ক্রু')
     .replace(/\bLock\b/gi, 'লক');
 
-  // Bengali genitive contractions for technical terms
+  // Bengali case contractions for common industrial words
   res = res
+    .replace(/ইউনিট\s+এ/g, 'ইউনিটে')
+    .replace(/ইউনিট\s+এর/g, 'ইউনিটের')
+    .replace(/লাইন\s+এ/g, 'লাইনে')
+    .replace(/লাইন\s+এর/g, 'লাইনের')
+    .replace(/স্ক্যানার\s+এ/g, 'স্ক্যানারে')
+    .replace(/স্ক্যানার\s+এর/g, 'স্ক্যানারের')
+    .replace(/কম্প্রেসর\s+এ/g, 'কম্প্রেসরে')
+    .replace(/কম্প্রেসর\s+এর/g, 'কম্প্রেসরের')
+    .replace(/বাংলা\s*তে/g, 'বাংলায়')
+    .replace(/ইংরেজি\s*এ/g, 'ইংরেজিতে')
     .replace(/মডেল\s+এর/g, 'মডেলের')
     .replace(/প্যানেল\s+এ/g, 'প্যানেলে')
     .replace(/প্যানেল\s+এর/g, 'প্যানেলের')
@@ -725,7 +930,8 @@ function cleanBanglaFormatting(text: string): string {
     .replace(/ফরমা\s+র/g, 'ফরমার')
     .replace(/ফ্রেম\s+এ/g, 'ফ্রেমে')
     .replace(/পলি\s+টি/g, 'পলিটি')
-    .replace(/অ্যালাইনমেন্ট\s+এ/g, 'অ্যালাইনমেন্টে');
+    .replace(/অ্যালাইনমেন্ট\s+এ/g, 'অ্যালাইনমেন্টে')
+    .replace(/সঠিকভাবে\s+যেন\s+স্ক্যান\s+করে\s+সম্পন্ন\s+করতে\s+পারে/g, 'সঠিকভাবে যেন স্ক্যান সম্পন্ন করা যায়');
 
   // Format English technical words / acronyms followed by Bengali suffixes nicely: "QR এর" -> "QR-এর"
   res = res.replace(/([A-Za-z0-9])\s+(এর|র|এ|তে|টি|টা|গুলো)(?=[\s.,!?।]|$)/g, '$1-$2');

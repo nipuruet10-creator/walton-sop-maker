@@ -72,6 +72,8 @@ export interface SOPDocument {
   status?: SOPStatus;
   authorId?: string;
   authorName?: string;
+  concernId?: string; // e.g. 'cac_idu', 'cac_odu'
+  concernName?: string; // e.g. 'CAC IDU Assembly Line'
   createdAt?: string;
   updatedAt?: string;
   checkedById?: string;

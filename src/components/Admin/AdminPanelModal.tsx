@@ -26,6 +26,7 @@ import {
   DEFAULT_FREE_MODELS,
   type OpenRouterModel,
 } from '../../services/openrouterService';
+import { PROCESS_CONCERNS } from '../../data/concernData';
 import {
   ShieldAlert,
   Users,
@@ -84,18 +85,26 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
   const [newUserId, setNewUserId] = useState<string>('');
   const [newUserEmpId, setNewUserEmpId] = useState<string>('');
   const [newUserName, setNewUserName] = useState<string>('');
-  const [newUserRole, setNewUserRole] = useState<UserRole>('checked_by');
-  const [newUserDesignation, setNewUserDesignation] = useState<string>('');
+  const [newUserRole, setNewUserRole] = useState<UserRole>('prepared_by');
+  const [newUserDesignation, setNewUserDesignation] = useState<string>('Process Engineer');
   const [newUserDepartment, setNewUserDepartment] = useState<string>('Process Development');
-  const [newUserPassword, setNewUserPassword] = useState<string>('Process@2026');
+  const [newUserConcernId, setNewUserConcernId] = useState<string>('cac_idu');
+  const [newUserPassword, setNewUserPassword] = useState<string>('');
 
   // Edit Approver Modal state
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [editUserId, setEditUserId] = useState<string>('');
   const [editName, setEditName] = useState<string>('');
   const [editEmpId, setEditEmpId] = useState<string>('');
   const [editRole, setEditRole] = useState<UserRole>('checked_by');
   const [editDesignation, setEditDesignation] = useState<string>('');
   const [editDepartment, setEditDepartment] = useState<string>('');
+  const [editConcernId, setEditConcernId] = useState<string>('');
+  const [editPassword, setEditPassword] = useState<string>('');
+  const [showEditPassword, setShowEditPassword] = useState<boolean>(false);
+
+  // Password visibility map for the users list
+  const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
 
   // Multi-PC Cloud Sync State & Operations
   const [syncConfig, setSyncConfig] = useState<CloudSyncConfig>(getCloudSyncConfig);
@@ -252,6 +261,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
     e.preventDefault();
     const cleanId = newUserId.trim();
     const cleanName = newUserName.trim();
+    const cleanEmpId = newUserEmpId.trim();
 
     if (!cleanId || !cleanName) {
       alert('Please provide both User ID and Full Name.');
@@ -263,15 +273,21 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
       return;
     }
 
+    // Default password to Name@ID or specified password
+    const defaultPass = newUserPassword.trim() || `${cleanName.split(' ')[0]}@${cleanEmpId || cleanId}`;
+    const selectedConcern = PROCESS_CONCERNS.find((c) => c.id === newUserConcernId);
+
     const newUser: UserProfile = {
       id: cleanId,
-      employeeId: newUserEmpId.trim() || undefined,
+      employeeId: cleanEmpId || undefined,
       username: cleanId,
       name: cleanName,
       role: newUserRole,
-      designation: newUserDesignation.trim() || 'Officer / Engineer',
+      designation: newUserDesignation.trim() || 'Process Engineer',
       department: newUserDepartment.trim() || 'Process Development',
-      passwordHash: newUserPassword.trim() || 'Process@2026',
+      concernId: newUserConcernId,
+      concernName: selectedConcern ? selectedConcern.name : 'General Process',
+      passwordHash: defaultPass,
       createdAt: new Date().toISOString(),
     };
 
@@ -281,13 +297,14 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
     setNewUserId('');
     setNewUserEmpId('');
     setNewUserName('');
-    setNewUserDesignation('');
+    setNewUserDesignation('Process Engineer');
     setNewUserDepartment('Process Development');
-    setNewUserPassword('Process@2026');
+    setNewUserConcernId('cac_idu');
+    setNewUserPassword('');
 
     const ok = await addUser(newUser);
     if (ok) {
-      showNotification(`User "${cleanName}" (${cleanId}) successfully added!`);
+      showNotification(`User "${cleanName}" (${cleanId}) successfully added with password: ${defaultPass}!`);
       await fetchUsers();
     } else {
       alert('Failed to add user.');
@@ -298,38 +315,82 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
   // Open Edit Dialog
   const handleOpenEdit = (user: UserProfile) => {
     setEditingUser(user);
+    setEditUserId(user.id);
     setEditName(user.name);
     setEditEmpId(user.employeeId || '');
     setEditRole(user.role);
     setEditDesignation(user.designation);
     setEditDepartment(user.department);
+    setEditConcernId(user.concernId || 'cac_idu');
+    setEditPassword(user.passwordHash || `${user.name.split(' ')[0]}@${user.employeeId || user.id}`);
+    setShowEditPassword(false);
   };
 
-  // Save Edited User
+  // Save Edited User (Including ID, Name, Role, Concern, and Password)
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
 
+    const cleanNewId = editUserId.trim() || editingUser.id;
+    const cleanName = editName.trim() || editingUser.name;
+    const cleanEmpId = editEmpId.trim() || undefined;
+    const selectedConcern = PROCESS_CONCERNS.find((c) => c.id === editConcernId);
+    const cleanPassword = editPassword.trim() || editingUser.passwordHash;
+
     const updatedUser: UserProfile = {
       ...editingUser,
-      name: editName.trim() || editingUser.name,
-      employeeId: editEmpId.trim() || undefined,
+      id: cleanNewId,
+      username: cleanNewId,
+      name: cleanName,
+      employeeId: cleanEmpId,
       role: editRole,
       designation: editDesignation.trim() || editingUser.designation,
       department: editDepartment.trim() || editingUser.department,
+      concernId: editConcernId,
+      concernName: selectedConcern ? selectedConcern.name : editingUser.concernName,
+      passwordHash: cleanPassword,
     };
 
+    // If ID changed and it's not the original ID, delete old record
+    if (cleanNewId !== editingUser.id) {
+      await deleteUser(editingUser.id);
+    }
+
     // Optimistic UI update
-    setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+    setUsers((prev) => prev.map((u) => (u.id === editingUser.id ? updatedUser : u)));
     setEditingUser(null);
 
     const ok = await updateUserProfile(updatedUser);
     if (ok) {
-      showNotification(`"${updatedUser.name}" details & routing successfully updated!`);
+      showNotification(`"${updatedUser.name}" details, concern & password successfully updated!`);
       await fetchUsers();
     } else {
       alert('Failed to update user details.');
       await fetchUsers();
+    }
+  };
+
+  // Direct Reset Password to Name@ID Pattern
+  const handleResetPasswordToDefault = async (user: UserProfile) => {
+    const firstName = user.name.split(' ')[0].replace(/[^a-zA-Z]/g, '') || user.username;
+    const defaultPattern = `${firstName}@${user.employeeId || user.id}`;
+    const confirmed = window.confirm(
+      `Reset password for "${user.name}" to default pattern: "${defaultPattern}"?`
+    );
+    if (!confirmed) return;
+
+    const updated: UserProfile = {
+      ...user,
+      passwordHash: defaultPattern,
+    };
+
+    setUsers((prev) => prev.map((u) => (u.id === user.id ? updated : u)));
+    const ok = await updateUserProfile(updated);
+    if (ok) {
+      showNotification(`Password for ${user.name} reset to: ${defaultPattern}`);
+      await fetchUsers();
+    } else {
+      alert('Failed to reset password.');
     }
   };
 
@@ -734,6 +795,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                               <p className="text-[10px] text-slate-400">
                                 {u.department}
                               </p>
+                              {/* Concern Section Badge */}
+                              <div className="mt-1.5 flex items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200">
+                                  <span>🏢</span>
+                                  <span>{u.concernName || 'General Process'}</span>
+                                </span>
+                              </div>
                             </div>
 
                             <span
@@ -758,18 +826,38 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                           </div>
                         </div>
 
-                        {/* Card Actions: Edit & Remove */}
-                        <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-slate-100 text-[11px]">
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            Password: ••••••••
-                          </span>
+                        {/* Card Actions: Password, Reset & Edit */}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-2.5 mt-2 border-t border-slate-100 text-[11px]">
+                          <div className="flex items-center gap-1 font-mono text-[10px]">
+                            <span className="text-slate-400 font-semibold">Pass:</span>
+                            <span className={showPasswordMap[u.id] ? "font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200" : "text-slate-400"}>
+                              {showPasswordMap[u.id] ? (u.passwordHash || `${u.id}@${u.employeeId}`) : '••••••••'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowPasswordMap((prev) => ({ ...prev, [u.id]: !prev[u.id] }))}
+                              className="p-1 text-slate-400 hover:text-blue-600 transition cursor-pointer"
+                              title={showPasswordMap[u.id] ? 'Hide Password' : 'Show Password'}
+                            >
+                              {showPasswordMap[u.id] ? <EyeOff className="w-3 h-3 text-blue-600" /> : <Eye className="w-3 h-3" />}
+                            </button>
+                          </div>
 
                           <div className="flex items-center gap-1.5">
                             <button
                               type="button"
+                              onClick={() => handleResetPasswordToDefault(u)}
+                              className="px-2 py-0.5 text-[10px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg transition cursor-pointer"
+                              title="Reset to Name@ID pattern"
+                            >
+                              Reset Pass
+                            </button>
+
+                            <button
+                              type="button"
                               onClick={() => handleOpenEdit(u)}
                               className="p-1 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer"
-                              title="Edit User Details & Route"
+                              title="Edit User ID, Password & Route"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
@@ -1378,7 +1466,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   <input
                     type="text"
                     value={newUserId}
-                    onChange={(e) => setNewUserId(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewUserId(val);
+                      if (!newUserPassword || newUserPassword.includes('@')) {
+                        setNewUserPassword(`${val.split(' ')[0]}@${newUserEmpId || '12345'}`);
+                      }
+                    }}
                     placeholder="e.g. Tanvir, Shanto"
                     required
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600 font-mono"
@@ -1392,7 +1486,13 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   <input
                     type="text"
                     value={newUserEmpId}
-                    onChange={(e) => setNewUserEmpId(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setNewUserEmpId(val);
+                      if (!newUserPassword || newUserPassword.includes('@')) {
+                        setNewUserPassword(`${newUserId || 'User'}@${val || '12345'}`);
+                      }
+                    }}
                     placeholder="e.g. 54634, 67544"
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600 font-mono"
                   />
@@ -1414,6 +1514,24 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
+                    Primary Concern / Section *
+                  </label>
+                  <select
+                    value={newUserConcernId}
+                    onChange={(e) => setNewUserConcernId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600 font-semibold"
+                  >
+                    {PROCESS_CONCERNS.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.icon} {c.name} ({c.code})
+                      </option>
+                    ))}
+                    <option value="all">🌐 All Sections (Plant-Wide / Lead Authority)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
                     Approval Route Role / Sequence *
                   </label>
                   <select
@@ -1424,44 +1542,60 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     <option value="prepared_by">Step 1: Prepared By (Process Concern)</option>
                     <option value="checked_by">Step 2: Reviewed By (Section In-Charge)</option>
                     <option value="approved_by">Step 3: Final Approved By (Process HOD)</option>
+                    <option value="admin">Super Admin (System Administrator)</option>
                   </select>
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Designation
-                  </label>
-                  <input
-                    type="text"
-                    value={newUserDesignation}
-                    onChange={(e) => setNewUserDesignation(e.target.value)}
-                    placeholder="e.g. Assistant Director, Process Engineer"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600"
-                  />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Designation
+                    </label>
+                    <input
+                      type="text"
+                      value={newUserDesignation}
+                      onChange={(e) => setNewUserDesignation(e.target.value)}
+                      placeholder="e.g. Process Engineer"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Department
+                    </label>
+                    <input
+                      type="text"
+                      value={newUserDepartment}
+                      onChange={(e) => setNewUserDepartment(e.target.value)}
+                      placeholder="Process Development"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600"
+                    />
+                  </div>
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Department
-                  </label>
-                  <input
-                    type="text"
-                    value={newUserDepartment}
-                    onChange={(e) => setNewUserDepartment(e.target.value)}
-                    placeholder="e.g. Process Development, QA"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Default Password
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-semibold text-slate-700">
+                      Password (Pattern: Name@ID) *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const namePart = (newUserId || newUserName || 'User').split(' ')[0];
+                        setNewUserPassword(`${namePart}@${newUserEmpId || '12345'}`);
+                      }}
+                      className="text-[10px] text-rose-700 font-bold hover:underline cursor-pointer"
+                    >
+                      Generate Name@ID
+                    </button>
+                  </div>
                   <input
                     type="text"
                     value={newUserPassword}
                     onChange={(e) => setNewUserPassword(e.target.value)}
-                    placeholder="Default: Process@2026"
+                    placeholder="e.g. Tanvir@54634"
+                    required
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-rose-600 font-mono"
                   />
                 </div>
@@ -1493,7 +1627,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               <div className="flex items-center justify-between border-b pb-2.5">
                 <h4 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                   <Edit2 className="w-4 h-4 text-blue-600" />
-                  <span>Edit User Details & Route: {editingUser.id}</span>
+                  <span>Edit User Profile & Credentials</span>
                 </h4>
                 <button
                   type="button"
@@ -1505,29 +1639,32 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
               </div>
 
               <form onSubmit={handleSaveEdit} className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    User ID (Read-only)
-                  </label>
-                  <input
-                    type="text"
-                    value={editingUser.id}
-                    disabled
-                    className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-slate-500 font-mono cursor-not-allowed"
-                  />
-                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      User ID (Login Identifier) *
+                    </label>
+                    <input
+                      type="text"
+                      value={editUserId}
+                      onChange={(e) => setEditUserId(e.target.value)}
+                      required
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600 font-mono"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Employee ID (Walton ID)
-                  </label>
-                  <input
-                    type="text"
-                    value={editEmpId}
-                    onChange={(e) => setEditEmpId(e.target.value)}
-                    placeholder="e.g. 54634, 67544"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600 font-mono"
-                  />
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Employee ID (Walton ID)
+                    </label>
+                    <input
+                      type="text"
+                      value={editEmpId}
+                      onChange={(e) => setEditEmpId(e.target.value)}
+                      placeholder="e.g. 54634, 67544"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600 font-mono"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -1541,6 +1678,24 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                     required
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600"
                   />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Assigned Concern / Section *
+                  </label>
+                  <select
+                    value={editConcernId}
+                    onChange={(e) => setEditConcernId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600 font-semibold"
+                  >
+                    {PROCESS_CONCERNS.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.icon} {c.name} ({c.code})
+                      </option>
+                    ))}
+                    <option value="all">🌐 All Sections (Plant-Wide / Lead Authority)</option>
+                  </select>
                 </div>
 
                 <div>
@@ -1559,28 +1714,71 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({ isOpen, onClos
                   </select>
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Designation
-                  </label>
-                  <input
-                    type="text"
-                    value={editDesignation}
-                    onChange={(e) => setEditDesignation(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600"
-                  />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Designation
+                    </label>
+                    <input
+                      type="text"
+                      value={editDesignation}
+                      onChange={(e) => setEditDesignation(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Department
+                    </label>
+                    <input
+                      type="text"
+                      value={editDepartment}
+                      onChange={(e) => setEditDepartment(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Department
-                  </label>
-                  <input
-                    type="text"
-                    value={editDepartment}
-                    onChange={(e) => setEditDepartment(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900 focus:outline-none focus:border-blue-600"
-                  />
+                {/* Password Change Field */}
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <KeyRound className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Account Password (Name@ID Pattern)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const firstName = (editName || editUserId || 'User').split(' ')[0].replace(/[^a-zA-Z]/g, '');
+                        setEditPassword(`${firstName}@${editEmpId || editUserId}`);
+                      }}
+                      className="text-[10.5px] text-blue-600 font-bold hover:underline cursor-pointer"
+                    >
+                      Set to Name@ID
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showEditPassword ? 'text' : 'password'}
+                      value={editPassword}
+                      onChange={(e) => setEditPassword(e.target.value)}
+                      placeholder="e.g. Sazzad@50463"
+                      required
+                      className="w-full bg-white border border-slate-300 rounded-xl pl-3 pr-10 py-2 text-slate-900 focus:outline-none focus:border-blue-600 font-mono text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowEditPassword(!showEditPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                      title={showEditPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showEditPassword ? <EyeOff className="w-3.5 h-3.5 text-blue-600" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Engineers will use this exact password to log into their dedicated section workspace.
+                  </p>
                 </div>
 
                 <div className="flex items-center justify-end gap-2 pt-3 border-t">

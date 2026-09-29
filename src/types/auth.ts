@@ -8,6 +8,8 @@ export interface UserProfile {
   role: UserRole;
   designation: string; // e.g. 'Process Engineer', 'Section In-Charge', 'Head of Dept'
   department: string; // e.g. 'Process Engineering', 'Quality Assurance', 'Plant Management'
+  concernId?: string; // e.g. 'cac_idu', 'cac_odu', 'rac_idu', 'rac_odu'
+  concernName?: string; // e.g. 'CAC IDU Assembly Line'
   passwordHash: string; // stored password (plain/hash for client-side persistence)
   defaultSignatureImg?: string; // saved signature stamp image
   createdAt: string;

@@ -15,15 +15,30 @@
 }
 
 @theme {
-  --font-bengali: 'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', 'Tiro Bangla', 'Vrinda', sans-serif;
-  --font-sans: 'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', 'Inter', 'Vrinda', system-ui, sans-serif;
+  --font-bengali: 'Hind Siliguri', 'Noto Sans Bengali', 'SolaimanLipi', 'Kalpurush', 'Tiro Bangla', sans-serif;
+  --font-sans: 'Inter', 'Hind Siliguri', 'Noto Sans Bengali', system-ui, sans-serif;
   --color-walton-blue: #005697;
   --color-walton-red: #EE1D23;
   --color-walton-dark: #0e1726;
 }
 
 body {
-  font-family: 'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', 'Hind Siliguri', 'Noto Sans Bengali', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure all borders inside SOP paper are solid, dark, and never faint at any zoom level */
+#sop-paper {
+  border-color: #000000 !important;
+}
+
+#sop-paper * {
+  border-color: #000000;
+}
+
+.font-bengali {
+  font-family: 'Hind Siliguri', 'Noto Sans Bengali', sans-serif !important;
 }
 
 /* Custom Print Rules for Strict A4 Landscape Fit */
@@ -68,7 +83,7 @@ body {
     max-height: 198mm !important;
     margin: 0 auto !important;
     box-shadow: none !important;
-    border: 1.5px solid #000 !important;
+    border: 1.5px solid #000000 !important;
     page-break-inside: avoid !important;
     page-break-after: avoid !important;
     overflow: hidden !important;
@@ -85,7 +100,7 @@ body {
   color: #000000;
   box-sizing: border-box;
   overflow: hidden;
-  font-family: 'Nirmala UI', 'Nirmala', 'SolaimanLipi', 'Kalpurush', 'Noto Sans Bengali', 'Hind Siliguri', 'Vrinda', 'Tiro Bangla', Arial, sans-serif !important;
+  font-family: 'Hind Siliguri', 'Noto Sans Bengali', 'Inter', Arial, sans-serif !important;
   letter-spacing: normal;
   word-spacing: normal;
 }

@@ -2,7 +2,17 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { SOPDocument } from './types/sop';
 import type { UserProfile, NotificationItem } from './types/auth';
 import { defaultSopData } from './data/defaultSopData';
-import { Navbar } from './components/Navbar';
+import {
+  getConcernById,
+  getConcernForUser,
+  createStarterSOPForConcern,
+  type ProcessConcern,
+} from './data/concernData';
+import { LeftSidebar, type AppView } from './components/Navigation/LeftSidebar';
+import { TopExecutiveHeader } from './components/Navigation/TopExecutiveHeader';
+import { ConcernDashboard } from './components/Dashboard/ConcernDashboard';
+import { ConcernWorkplaceView } from './components/Workspace/ConcernWorkplaceView';
+import { ApprovalRouteView } from './components/Workflow/ApprovalRouteView';
 import { WorkflowActionBar } from './components/Workflow/WorkflowActionBar';
 import { ImageManager } from './components/InputPanel/ImageManager';
 import { BanglishProcedureEditor } from './components/InputPanel/BanglishProcedureEditor';
@@ -15,6 +25,7 @@ import { UserWorkspaceModal } from './components/Workspace/UserWorkspaceModal';
 import { MasterArchiveModal } from './components/Archive/MasterArchiveModal';
 import { AnalyticsDashboardModal } from './components/Analytics/AnalyticsDashboardModal';
 import { AdminPanelModal } from './components/Admin/AdminPanelModal';
+import { ApiKeyModal } from './components/Modals/ApiKeyModal';
 import {
   generateSOPWithGemini,
   offlineConvertBanglish,
@@ -30,8 +41,10 @@ import {
   getActiveUserSession,
   setActiveUserSession,
   getGlobalAiConfig,
+  saveGlobalAiConfig,
   getUserNotifications,
   getSOPById,
+  getAllSOPs,
   getUserWorkingDraft,
   saveUserWorkingDraft,
   createDefaultSopForUser,
@@ -53,6 +66,8 @@ import {
   Type,
   LayoutGrid,
   RotateCcw,
+  Printer,
+  Download,
 } from 'lucide-react';
 
 const GEMINI_KEY_STORAGE = 'walton_sop_gemini_key';
@@ -65,6 +80,15 @@ export const App: React.FC = () => {
     return getActiveUserSession() || null;
   });
 
+  // Active Process Concern (Default to user's assigned concern)
+  const [activeConcern, setActiveConcern] = useState<ProcessConcern>(() => {
+    const session = getActiveUserSession();
+    return getConcernForUser(session);
+  });
+
+  // Main View Router: 'dashboard' is the default executive landing view!
+  const [currentView, setCurrentView] = useState<AppView>('dashboard');
+
   // Current SOP document state - strictly isolated per logged-in user!
   const [data, setData] = useState<SOPDocument>(() => {
     const session = getActiveUserSession();
@@ -73,10 +97,12 @@ export const App: React.FC = () => {
         const cached = localStorage.getItem(`walton_sop_user_draft_v2_${session.id}`);
         if (cached) {
           const parsed = JSON.parse(cached);
-          // Purge trial BOPP Tape draft if present to guarantee clean blank default
           if (
             parsed.header?.processName?.includes('BOPP Tape') ||
-            (parsed.photos && parsed.photos.some((p: any) => p.url?.includes('Tape Dispenser') || p.name?.includes('Pasted Image')))
+            (parsed.photos &&
+              parsed.photos.some(
+                (p: any) => p.url?.includes('Tape Dispenser') || p.name?.includes('Pasted Image')
+              ))
           ) {
             localStorage.removeItem(`walton_sop_user_draft_v2_${session.id}`);
             return createDefaultSopForUser(session);
@@ -96,16 +122,21 @@ export const App: React.FC = () => {
     return !getActiveUserSession();
   });
   const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState<boolean>(false);
-  const [isMasterArchiveOpen, setIsMasterArchiveOpen] = useState<boolean>(false);
-  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState<boolean>(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(false);
+  const [lastUsedEngine, setLastUsedEngine] = useState<string>('');
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Centralized AI Settings from storage
   const [openRouterKey, setOpenRouterKey] = useState<string>(() => {
     return getGlobalAiConfig().openRouterKey || localStorage.getItem(OPENROUTER_API_KEY_STORAGE) || '';
   });
   const [openRouterModel, setOpenRouterModel] = useState<string>(() => {
-    return getGlobalAiConfig().openRouterModel || localStorage.getItem(OPENROUTER_MODEL_STORAGE) || 'openrouter/free';
+    return (
+      getGlobalAiConfig().openRouterModel ||
+      localStorage.getItem(OPENROUTER_MODEL_STORAGE) ||
+      'google/gemma-2-9b-it:free'
+    );
   });
   const [geminiKey, setGeminiKey] = useState<string>(() => {
     return getGlobalAiConfig().geminiKey || localStorage.getItem(GEMINI_KEY_STORAGE) || '';
@@ -132,17 +163,28 @@ export const App: React.FC = () => {
 
   // Live Notifications
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
 
   const refreshNotifications = async () => {
     if (currentUser) {
       try {
         const notifs = await getUserNotifications(currentUser);
         setNotifications(notifs);
+
+        const all = await getAllSOPs(false);
+        const pending = all.filter(
+          (s) =>
+            s.status === 'forwarded_to_checker' ||
+            s.status === 'checked' ||
+            s.status === 'forwarded_to_approver'
+        ).length;
+        setPendingApprovalsCount(pending);
       } catch (e) {
         console.warn('Error loading notifications:', e);
       }
     } else {
       setNotifications([]);
+      setPendingApprovalsCount(0);
     }
   };
 
@@ -166,7 +208,6 @@ export const App: React.FC = () => {
         const cloudSops = await pullAllSopsFromCloud();
         if (isCancelled || !cloudSops || cloudSops.length === 0) return;
 
-        // Check if our active document has been approved or updated on another PC
         setData((prev) => {
           if (!prev) return prev;
           const match = cloudSops.find(
@@ -214,7 +255,6 @@ export const App: React.FC = () => {
       const updated: SOPDocument = e.detail;
       if (!updated) return;
 
-      // If the current document matches or belongs to this user, update it immediately!
       setData((prev) => {
         if (prev.id === updated.id) {
           return updated;
@@ -273,6 +313,11 @@ export const App: React.FC = () => {
       const targetDoc = await getSOPById(sopId);
       if (targetDoc) {
         setData(targetDoc);
+        if (targetDoc.concernId) {
+          const c = getConcernById(targetDoc.concernId);
+          if (c) setActiveConcern(c);
+        }
+        setCurrentView('editor');
       } else {
         alert('SOP document not found.');
       }
@@ -306,6 +351,10 @@ export const App: React.FC = () => {
     setCurrentUser(user);
     setActiveUserSession(user);
     setIsLoginModalOpen(false);
+
+    const userConcern = getConcernForUser(user);
+    setActiveConcern(userConcern);
+
     try {
       const draft = await getUserWorkingDraft(user.id);
       if (draft) {
@@ -319,6 +368,8 @@ export const App: React.FC = () => {
       const fresh = createDefaultSopForUser(user);
       setData(fresh);
     }
+    // Landing view stays on Dashboard as requested by user sequence!
+    setCurrentView('dashboard');
   };
 
   const handleLogout = () => {
@@ -396,6 +447,7 @@ export const App: React.FC = () => {
         if (parsed.header && parsed.procedure) {
           setData(parsed);
           alert('SOP JSON data loaded successfully!');
+          setCurrentView('editor');
         } else {
           alert('Invalid SOP JSON structure.');
         }
@@ -422,12 +474,14 @@ export const App: React.FC = () => {
     }
 
     if (currentUser) {
-      const fresh = createDefaultSopForUser(currentUser);
+      const fresh = createStarterSOPForConcern(activeConcern.id, currentUser);
       setData(fresh);
       saveUserWorkingDraft(currentUser.id, fresh);
       setIsWorkspaceModalOpen(false);
+      setCurrentView('editor');
     } else {
       setData(defaultSopData);
+      setCurrentView('editor');
     }
   };
 
@@ -442,7 +496,7 @@ export const App: React.FC = () => {
     if (!confirmReset) return;
 
     if (currentUser) {
-      const fresh = createDefaultSopForUser(currentUser);
+      const fresh = createStarterSOPForConcern(activeConcern.id, currentUser);
       setData(fresh);
       saveUserWorkingDraft(currentUser.id, fresh);
     } else {
@@ -450,41 +504,48 @@ export const App: React.FC = () => {
     }
   };
 
-  // Main Procedure Step Generation
+  // Convert Banglish procedure to natural factory Bengali
   const handleAutoGenerate = async () => {
     const input = data.procedure.banglishInput;
     if (!input || input.trim() === '') {
-      alert('Please write or paste your Banglish notes in the editor first!');
+      alert('Please enter Banglish text in the procedure box first!');
       return;
     }
 
     setIsGenerating(true);
     try {
       const globalCfg = getGlobalAiConfig();
-      const effProvider = globalCfg.activeProvider || activeProvider;
       const effOpenRouterKey = globalCfg.openRouterKey || openRouterKey;
       const effOpenRouterModel = globalCfg.openRouterModel || openRouterModel;
       const effGeminiKey = globalCfg.geminiKey || geminiKey;
+      const effProvider = globalCfg.activeProvider || activeProvider;
 
-      let result;
-      if (effProvider === 'gemini' && effGeminiKey) {
-        result = await generateSOPWithGemini(input, effGeminiKey, data.photos.length);
-      } else if (effOpenRouterKey) {
-        result = await generateSOPWithOpenRouter(input, effOpenRouterKey, effOpenRouterModel, data.photos.length);
+      let generated;
+      let usedEngine = '';
+
+      if (effProvider === 'openrouter' && effOpenRouterKey) {
+        generated = await generateSOPWithOpenRouter(input, effOpenRouterKey, effOpenRouterModel);
+        usedEngine = `OpenRouter AI (${effOpenRouterModel.replace(':free', '').split('/').pop()})`;
+      } else if (effProvider === 'gemini' && effGeminiKey) {
+        generated = await generateSOPWithGemini(input, effGeminiKey);
+        usedEngine = 'Google Gemini AI (Online)';
       } else {
-        result = offlineConvertBanglish(input);
+        generated = offlineConvertBanglish(input);
+        usedEngine = 'Smart Factory Engine (Offline)';
       }
+
+      setLastUsedEngine(usedEngine);
 
       setData((prev) => ({
         ...prev,
         procedure: {
           ...prev.procedure,
-          steps: result.steps.length > 0 ? result.steps : prev.procedure.steps,
+          steps: generated.steps.length > 0 ? generated.steps : prev.procedure.steps,
           qualityPoints:
-            result.qualityPoints.length > 0 ? result.qualityPoints : prev.procedure.qualityPoints,
+            generated.qualityPoints.length > 0 ? generated.qualityPoints : prev.procedure.qualityPoints,
           generalInstructions:
-            result.generalInstructions.length > 0
-              ? result.generalInstructions
+            generated.generalInstructions.length > 0
+              ? generated.generalInstructions
               : prev.procedure.generalInstructions,
         },
       }));
@@ -499,6 +560,7 @@ export const App: React.FC = () => {
     } catch (err: any) {
       console.warn('Procedure generation encountered error, falling back to offline engine:', err);
       const fallback = offlineConvertBanglish(input);
+      setLastUsedEngine('Smart Factory Engine (Offline Fallback)');
       setData((prev) => ({
         ...prev,
         procedure: {
@@ -532,11 +594,15 @@ export const App: React.FC = () => {
       const effOpenRouterModel = globalCfg.openRouterModel || openRouterModel;
 
       let points: string[];
+      let usedEngine = '';
       if (effOpenRouterKey) {
         points = await generateQualityPointsWithOpenRouter(input, effOpenRouterKey, effOpenRouterModel);
+        usedEngine = `OpenRouter AI (${effOpenRouterModel.replace(':free', '').split('/').pop()})`;
       } else {
         points = offlineConvertQualityPoints(input);
+        usedEngine = 'Smart Factory Engine (Offline)';
       }
+      setLastUsedEngine(usedEngine);
 
       if (points && points.length > 0) {
         setData((prev) => ({
@@ -573,7 +639,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-200 font-sans select-none print:h-auto print:overflow-visible print:bg-white">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#F8FAFC] font-sans select-none print:h-auto print:overflow-visible print:bg-white">
       {/* Hidden file input for JSON import */}
       <input
         type="file"
@@ -583,426 +649,563 @@ export const App: React.FC = () => {
         className="hidden"
       />
 
-      {/* Top Application Navbar */}
-      <Navbar
+      {/* 1. LEFT SIDEBAR (Executive Walton Mission Control Navigation) */}
+      <LeftSidebar
+        currentView={currentView}
+        onChangeView={(view) => setCurrentView(view)}
         currentUser={currentUser}
-        notifications={notifications}
-        onSelectSopById={handleSelectSopById}
-        onOpenLogin={() => setIsLoginModalOpen(true)}
-        onLogout={handleLogout}
-        onOpenWorkspace={() => setIsWorkspaceModalOpen(true)}
-        onOpenMasterArchive={() => setIsMasterArchiveOpen(true)}
-        onOpenAnalytics={() => setIsAnalyticsModalOpen(true)}
+        activeConcern={activeConcern}
+        pendingApprovalsCount={pendingApprovalsCount}
         onOpenAdminPanel={() => setIsAdminModalOpen(true)}
-        onPrint={handlePrint}
-        onDownloadPdf={handleDownloadPdf}
-        onExportExcel={handleExportExcel}
-        onExportJson={handleExportJson}
-        onImportJson={() => importFileRef.current?.click()}
-        zoom={zoom}
-        setZoom={setZoom}
-        onAutoGenerate={handleAutoGenerate}
-        isGenerating={isGenerating}
-        isDownloadingPdf={isDownloadingPdf}
-        onNewSop={handleNewSop}
-        onResetSop={handleResetSop}
-        isSopApproved={data.status === 'approved'}
       />
 
-      {/* Workflow & Approval Status Action Bar */}
-      <WorkflowActionBar
-        currentSop={data}
-        currentUser={currentUser}
-        onUpdateSop={(updated) => setData(updated)}
-        onOpenWorkspace={() => setIsWorkspaceModalOpen(true)}
-        onOpenLogin={() => setIsLoginModalOpen(true)}
-        onNewSop={handleNewSop}
-        onResetSop={handleResetSop}
-      />
+      {/* 2. MAIN APPLICATION CONTENT VIEWPORT */}
+      <div className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden bg-[#F8FAFC]">
+        {/* Top Executive Header Bar */}
+        <TopExecutiveHeader
+          currentUser={currentUser}
+          activeConcern={activeConcern}
+          currentView={currentView}
+          notifications={notifications}
+          onOpenLogin={() => setIsLoginModalOpen(true)}
+          onLogout={handleLogout}
+          onFastCreateSop={() => {
+            const fresh = createStarterSOPForConcern(activeConcern.id, currentUser);
+            setData(fresh);
+            if (currentUser) saveUserWorkingDraft(currentUser.id, fresh);
+            setCurrentView('editor');
+          }}
+          onTriggerGlobalSync={async () => {
+            setIsSyncing(true);
+            try {
+              await pullAllSopsFromCloud();
+              await refreshNotifications();
+            } finally {
+              setIsSyncing(false);
+            }
+          }}
+          isSyncing={isSyncing}
+          onSelectSopById={handleSelectSopById}
+          zoom={zoom}
+          setZoom={setZoom}
+        />
 
-      {/* Main Workspace Area (Left Input Panel + Right Live Canvas) */}
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Left Side: Input Panel (Collapsible) */}
-        <aside
-          className={`no-print transition-all duration-300 ease-in-out bg-white border-r border-slate-300 flex flex-col z-20 shrink-0 ${
-            isSidebarOpen ? 'w-[420px] lg:w-[480px]' : 'w-0'
-          }`}
-          style={{ overflow: isSidebarOpen ? 'visible' : 'hidden' }}
-        >
-          {isSidebarOpen && (
-            <div className="flex flex-col h-full overflow-hidden">
-              {/* Panel Header & Quick Actions */}
-              <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
-                <div>
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                    SOP Parameter Editor
-                  </h2>
-                  <p className="text-[10px] text-slate-400">
-                    {data.status === 'approved' ? 'Officially Approved & Locked' : 'Images, Banglish procedure, header & tables'}
-                  </p>
-                </div>
+        {/* View Router Main Container */}
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
+          {/* VIEW 1: EXECUTIVE CONCERN DASHBOARD (Landing View) */}
+          {currentView === 'dashboard' && (
+            <div className="p-4 sm:p-6 lg:p-8 animate-in fade-in duration-200">
+              <ConcernDashboard
+                currentUser={currentUser}
+                onSelectConcern={(concern) => {
+                  setActiveConcern(concern);
+                  setCurrentView('workplace');
+                }}
+                onCreateConcernSop={(concern) => {
+                  setActiveConcern(concern);
+                  const fresh = createStarterSOPForConcern(concern.id, currentUser);
+                  setData(fresh);
+                  if (currentUser) saveUserWorkingDraft(currentUser.id, fresh);
+                  setCurrentView('editor');
+                }}
+                onOpenApprovalRoute={() => setCurrentView('approval_route')}
+                onOpenArchive={() => setCurrentView('archive')}
+                onOpenAdminPanel={() => setIsAdminModalOpen(true)}
+              />
+            </div>
+          )}
 
-                <div className="flex items-center gap-1">
-                  {data.status !== 'approved' && (
-                    <button
-                      type="button"
-                      onClick={handleResetSop}
-                      className="flex items-center gap-1 bg-rose-900/80 hover:bg-rose-800 text-rose-200 text-[11px] font-bold px-2 py-1 rounded transition cursor-pointer border border-rose-700/60"
-                      title="Reset all form inputs"
-                    >
-                      <RotateCcw className="w-3 h-3 text-rose-300" />
-                      <span>Reset</span>
-                    </button>
+          {/* VIEW 2: DEDICATED CONCERN WORKPLACE VIEW */}
+          {currentView === 'workplace' && (
+            <div className="p-4 sm:p-6 lg:p-8 animate-in fade-in duration-200">
+              <ConcernWorkplaceView
+                concern={activeConcern}
+                currentUser={currentUser}
+                onBackToDashboard={() => setCurrentView('dashboard')}
+                onOpenSopInEditor={(sop) => {
+                  setData(sop);
+                  setCurrentView('editor');
+                }}
+                onCreateNewWithStarter={(concern) => {
+                  const fresh = createStarterSOPForConcern(concern.id, currentUser);
+                  setData(fresh);
+                  if (currentUser) saveUserWorkingDraft(currentUser.id, fresh);
+                  setCurrentView('editor');
+                }}
+              />
+            </div>
+          )}
+
+          {/* VIEW 3: FULL SOP STUDIO / LIVE EDITOR & CANVAS */}
+          {currentView === 'editor' && (
+            <div className="h-full flex flex-col overflow-hidden animate-in fade-in duration-150">
+              {/* Workflow & Approval Status Action Bar */}
+              <WorkflowActionBar
+                currentSop={data}
+                currentUser={currentUser}
+                onUpdateSop={(updated) => setData(updated)}
+                onOpenWorkspace={() => setCurrentView('workplace')}
+                onOpenLogin={() => setIsLoginModalOpen(true)}
+                onNewSop={handleNewSop}
+                onResetSop={handleResetSop}
+              />
+
+              {/* Main Workspace Area (Left Input Panel + Right Live Canvas) */}
+              <div className="flex-1 flex overflow-hidden relative">
+                {/* Left Side: Input Panel (Collapsible) */}
+                <aside
+                  className={`no-print transition-all duration-300 ease-in-out bg-white border-r border-slate-300 flex flex-col z-20 shrink-0 ${
+                    isSidebarOpen ? 'w-[420px] lg:w-[480px]' : 'w-0'
+                  }`}
+                  style={{ overflow: isSidebarOpen ? 'visible' : 'hidden' }}
+                >
+                  {isSidebarOpen && (
+                    <div className="flex flex-col h-full overflow-hidden">
+                      {/* Panel Header & Quick Actions */}
+                      <div className="p-3 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                        <div>
+                          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                            SOP Parameter Editor
+                          </h2>
+                          <p className="text-[10px] text-slate-400">
+                            {data.status === 'approved'
+                              ? 'Officially Approved & Locked'
+                              : 'Images, Banglish procedure, header & tables'}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          {data.status !== 'approved' && (
+                            <button
+                              type="button"
+                              onClick={handleResetSop}
+                              className="flex items-center gap-1 bg-rose-900/80 hover:bg-rose-800 text-rose-200 text-[11px] font-bold px-2 py-1 rounded transition cursor-pointer border border-rose-700/60"
+                              title="Reset all form inputs"
+                            >
+                              <RotateCcw className="w-3 h-3 text-rose-300" />
+                              <span>Reset</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={handlePrint}
+                            className="flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold px-2 py-1 rounded transition cursor-pointer"
+                            title="Print SOP Canvas"
+                          >
+                            <Printer className="w-3 h-3 text-slate-300" />
+                            <span>Print</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleExportJson}
+                            className="flex items-center gap-1 bg-slate-700 hover:bg-slate-600 text-white text-[11px] font-bold px-2 py-1 rounded transition cursor-pointer"
+                            title="Export Backup JSON"
+                          >
+                            <Download className="w-3 h-3 text-slate-300" />
+                            <span>JSON</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleExportExcel}
+                            className="flex items-center gap-1 bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-1 rounded transition cursor-pointer"
+                          >
+                            <FileSpreadsheet className="w-3 h-3 text-emerald-200" />
+                            <span>Excel</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDownloadPdf}
+                            disabled={isDownloadingPdf}
+                            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold px-2.5 py-1 rounded transition cursor-pointer disabled:opacity-50"
+                          >
+                            <FileDown className="w-3 h-3 text-blue-200" />
+                            <span>{isDownloadingPdf ? 'Creating...' : 'PDF'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Approved Document Lock Banner */}
+                      {data.status === 'approved' && (
+                        <div className="bg-emerald-50 border-b border-emerald-200 p-2.5 flex items-center gap-2 text-xs text-emerald-950">
+                          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <div className="leading-tight">
+                            <strong className="block text-emerald-900">Document Officially Approved</strong>
+                            <span className="text-[10.5px] text-emerald-700">
+                              Editing is locked to ensure compliance. Only official PDF download is enabled.
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tabs Header */}
+                      <div className="bg-slate-100 border-b border-slate-200 p-1.5 flex items-center justify-between gap-1 shrink-0 overflow-x-auto">
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('photos')}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                            activeTab === 'photos'
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          <span>Photos ({data.photos.length})</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('procedure')}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                            activeTab === 'procedure'
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Procedure &amp; AI</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('header')}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                            activeTab === 'header'
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>Header</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('safety')}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                            activeTab === 'safety'
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          <span>Safety</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('tables')}
+                          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                            activeTab === 'tables'
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          <TableIcon className="w-3.5 h-3.5" />
+                          <span>Parts/Tools</span>
+                        </button>
+                      </div>
+
+                      {/* Tab Panels Content */}
+                      {data.status === 'approved' ? (
+                        <div className="flex-1 overflow-y-auto p-6 flex flex-col items-center justify-center text-center space-y-4 bg-emerald-50/50 m-3 rounded-2xl border border-emerald-200">
+                          <div className="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shadow-xs">
+                            <ShieldCheck className="w-8 h-8" />
+                          </div>
+                          <div className="space-y-1 max-w-xs">
+                            <h3 className="font-black text-slate-900 text-sm">Official SOP Document Locked</h3>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              This Standard Operating Procedure has received final Head of Department approval. To preserve technical compliance, editing parameters is disabled.
+                            </p>
+                          </div>
+                          <div className="pt-2">
+                            <button
+                              type="button"
+                              onClick={handleDownloadPdf}
+                              disabled={isDownloadingPdf}
+                              className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md transition cursor-pointer disabled:opacity-50"
+                            >
+                              <FileDown className="w-4 h-4" />
+                              <span>{isDownloadingPdf ? 'Generating PDF...' : 'Download Official PDF'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                          {activeTab === 'photos' && (
+                            <ImageManager
+                              photos={data.photos}
+                              onChange={(photos) => setData((prev) => ({ ...prev, photos }))}
+                              imageFit={data.imageFit}
+                              onUpdateFit={(fit) => setData((prev) => ({ ...prev, imageFit: fit }))}
+                              gridCols={data.gridCols}
+                              onUpdateGridCols={(cols) => setData((prev) => ({ ...prev, gridCols: cols }))}
+                            />
+                          )}
+
+                          {activeTab === 'procedure' && (
+                            <BanglishProcedureEditor
+                              procedure={data.procedure}
+                              onChange={(procedure) => setData((prev) => ({ ...prev, procedure }))}
+                              onGenerate={handleAutoGenerate}
+                              isGenerating={isGenerating}
+                              onGenerateQuality={handleAutoGenerateQuality}
+                              isGeneratingQuality={isGeneratingQuality}
+                              hasApiKey={Boolean(openRouterKey || geminiKey)}
+                              activeProvider={activeProvider}
+                              activeModel={openRouterModel}
+                              onOpenAiModal={() => setIsApiKeyModalOpen(true)}
+                              stepFontSize={data.stepFontSize}
+                              onFontSizeChange={(stepFontSize) => setData((prev) => ({ ...prev, stepFontSize }))}
+                              qualityFontSize={data.qualityFontSize}
+                              onQualityFontSizeChange={(qualityFontSize) => setData((prev) => ({ ...prev, qualityFontSize }))}
+                              lastUsedEngine={lastUsedEngine}
+                            />
+                          )}
+
+                          {activeTab === 'header' && (
+                            <HeaderEditor
+                              header={data.header}
+                              onChange={(header) => setData((prev) => ({ ...prev, header }))}
+                            />
+                          )}
+
+                          {activeTab === 'safety' && (
+                            <SafetyEditor
+                              safety={data.safety}
+                              onChange={(safety) => setData((prev) => ({ ...prev, safety }))}
+                            />
+                          )}
+
+                          {activeTab === 'tables' && (
+                            <TablesEditor
+                              parts={data.parts}
+                              tools={data.tools}
+                              onPartsChange={(parts) => setData((prev) => ({ ...prev, parts }))}
+                              onToolsChange={(tools) => setData((prev) => ({ ...prev, tools }))}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={handleExportExcel}
-                    className="flex items-center gap-1 bg-emerald-700 hover:bg-emerald-600 text-white text-[11px] font-bold px-2.5 py-1 rounded transition cursor-pointer"
-                  >
-                    <FileSpreadsheet className="w-3 h-3 text-emerald-200" />
-                    <span>Excel</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDownloadPdf}
-                    disabled={isDownloadingPdf}
-                    className="flex items-center gap-1 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold px-2.5 py-1 rounded transition cursor-pointer disabled:opacity-50"
-                  >
-                    <FileDown className="w-3 h-3 text-blue-200" />
-                    <span>{isDownloadingPdf ? 'Creating...' : 'PDF'}</span>
-                  </button>
-                </div>
-              </div>
+                </aside>
 
-              {/* Approved Document Lock Banner */}
-              {data.status === 'approved' && (
-                <div className="bg-emerald-50 border-b border-emerald-200 p-2.5 flex items-center gap-2 text-xs text-emerald-950">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <div className="leading-tight">
-                    <strong className="block text-emerald-900">Document Officially Approved</strong>
-                    <span className="text-[10.5px] text-emerald-700">
-                      Editing is locked to ensure compliance. Only official PDF download is enabled.
-                    </span>
+                {/* Sidebar Collapse Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  className="no-print absolute top-3 left-0 z-30 bg-slate-900 text-white p-1 rounded-r-md hover:bg-blue-600 transition shadow-md cursor-pointer"
+                  style={{ left: isSidebarOpen ? (window.innerWidth >= 1024 ? 480 : 420) : 0 }}
+                  title={isSidebarOpen ? 'Collapse Editor' : 'Expand Editor'}
+                >
+                  {isSidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </button>
+
+                {/* Right Side: Live SOP Paper Preview Container */}
+                <main className="flex-1 overflow-auto bg-slate-200/90 p-4 sm:p-8 flex flex-col items-center justify-start print:p-0 print:bg-white print:overflow-visible">
+                  {/* Canvas Quick Layout Bar */}
+                  <div className="no-print w-full max-w-[1123px] mb-3 bg-white border border-slate-300 rounded-xl px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs">
+                    {/* Font Size Selector */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex items-center gap-1 font-semibold text-slate-700">
+                        <Type className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Step Font:</span>
+                      </span>
+                      <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                        {(
+                          [
+                            { id: 'auto', label: 'Auto' },
+                            { id: 'compact', label: 'Compact' },
+                            { id: 'normal', label: 'Normal' },
+                            { id: 'large', label: 'Large' },
+                            { id: 'xlarge', label: 'X-Large' },
+                          ] as const
+                        ).map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setData((prev) => ({ ...prev, stepFontSize: opt.id }))}
+                            className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
+                              (data.stepFontSize || 'normal') === opt.id
+                                ? 'bg-blue-600 text-white shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Quality Font Selector */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-semibold text-slate-700">Quality Font:</span>
+                      <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                        {(
+                          [
+                            { id: 'auto', label: 'Auto' },
+                            { id: 'compact', label: 'Compact' },
+                            { id: 'normal', label: 'Normal' },
+                            { id: 'large', label: 'Large' },
+                          ] as const
+                        ).map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setData((prev) => ({ ...prev, qualityFontSize: opt.id }))}
+                            className={`px-1.5 py-0.5 rounded text-[10.5px] font-medium transition cursor-pointer ${
+                              (data.qualityFontSize || 'auto') === opt.id
+                                ? 'bg-amber-600 text-white shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Photo Grid Columns */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="flex items-center gap-1 font-semibold text-slate-700">
+                        <LayoutGrid className="w-3.5 h-3.5 text-blue-600" />
+                        <span>Columns:</span>
+                      </span>
+                      <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                        {(
+                          [
+                            { id: 0, label: 'Auto' },
+                            { id: 2, label: '2 Col' },
+                            { id: 3, label: '3 Col' },
+                          ] as const
+                        ).map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setData((prev) => ({ ...prev, gridCols: opt.id }))}
+                            className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
+                              (data.gridCols || 0) === opt.id
+                                ? 'bg-blue-600 text-white shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Image Fit */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-semibold text-slate-700">Image Fit:</span>
+                      <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                        {(
+                          [
+                            { id: 'contain', label: 'Contain' },
+                            { id: 'cover', label: 'Cover' },
+                          ] as const
+                        ).map((opt) => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setData((prev) => ({ ...prev, imageFit: opt.id }))}
+                            className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
+                              (data.imageFit || 'contain') === opt.id
+                                ? 'bg-blue-600 text-white shadow-xs font-bold'
+                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
 
-              {/* Tabs Header */}
-              <div className="bg-slate-100 border-b border-slate-200 p-1.5 flex items-center justify-between gap-1 shrink-0 overflow-x-auto">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('photos')}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                    activeTab === 'photos'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  <ImageIcon className="w-3.5 h-3.5" />
-                  <span>Photos ({data.photos.length})</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('procedure')}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                    activeTab === 'procedure'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Procedure & AI</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('header')}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                    activeTab === 'header'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Header</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('safety')}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                    activeTab === 'safety'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Safety</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('tables')}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
-                    activeTab === 'tables'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  <TableIcon className="w-3.5 h-3.5" />
-                  <span>Tables</span>
-                </button>
-              </div>
-
-              {/* Tab Content Panel (Scrollable, locked if approved) */}
-              <div className={`flex-1 overflow-y-auto p-4 bg-slate-50 ${data.status === 'approved' ? 'pointer-events-none opacity-80' : ''}`}>
-                {activeTab === 'photos' && (
-                  <ImageManager
-                    photos={data.photos}
-                    onChange={(photos) => setData({ ...data, photos })}
-                    imageFit={data.imageFit || 'contain'}
-                    onUpdateFit={(fit) => setData({ ...data, imageFit: fit })}
-                    gridCols={data.gridCols || 0}
-                    onUpdateGridCols={(cols) => setData({ ...data, gridCols: cols })}
-                  />
-                )}
-
-                {activeTab === 'procedure' && (
-                  <BanglishProcedureEditor
-                    procedure={data.procedure}
-                    onChange={(procedure) => setData({ ...data, procedure })}
-                    onGenerate={handleAutoGenerate}
-                    isGenerating={isGenerating}
-                    onGenerateQuality={handleAutoGenerateQuality}
-                    isGeneratingQuality={isGeneratingQuality}
-                    hasApiKey={Boolean(openRouterKey || geminiKey)}
-                    activeProvider={activeProvider}
-                    activeModel={openRouterModel}
-                    onOpenAiModal={() => {
-                      if (currentUser?.role === 'admin') {
-                        setIsAdminModalOpen(true);
-                      } else {
-                        alert('Central AI engine configuration is managed in the Admin Panel.');
-                      }
+                  {/* SOP Paper Render Container */}
+                  <div
+                    id="sop-paper-wrapper"
+                    className="transition-transform duration-200 origin-top shadow-2xl rounded-xs print:shadow-none"
+                    style={{
+                      transform: `scale(${zoom})`,
                     }}
-                    stepFontSize={data.stepFontSize || 'auto'}
-                    onFontSizeChange={(stepFontSize) => setData((prev) => ({ ...prev, stepFontSize }))}
-                    qualityFontSize={data.qualityFontSize || 'auto'}
-                    onQualityFontSizeChange={(qualityFontSize) =>
-                      setData((prev) => ({ ...prev, qualityFontSize }))
-                    }
-                  />
-                )}
-
-                {activeTab === 'header' && (
-                  <HeaderEditor
-                    header={data.header}
-                    onChange={(header) => setData({ ...data, header })}
-                  />
-                )}
-
-                {activeTab === 'safety' && (
-                  <SafetyEditor
-                    safety={data.safety}
-                    onChange={(safety) => setData({ ...data, safety })}
-                  />
-                )}
-
-                {activeTab === 'tables' && (
-                  <TablesEditor
-                    parts={data.parts}
-                    tools={data.tools}
-                    onPartsChange={(parts) => setData({ ...data, parts })}
-                    onToolsChange={(tools) => setData({ ...data, tools })}
-                  />
-                )}
+                  >
+                    <SOPPaper
+                      data={data}
+                      onUpdateHeader={(updates) =>
+                        setData((prev) => ({ ...prev, header: { ...prev.header, ...updates } }))
+                      }
+                      onUpdateFontSize={(size) => setData((prev) => ({ ...prev, stepFontSize: size }))}
+                      onUpdateStep={(idx, val) => {
+                        const steps = [...data.procedure.steps];
+                        steps[idx] = val;
+                        setData((prev) => ({ ...prev, procedure: { ...prev.procedure, steps } }));
+                      }}
+                      onUpdateQuality={(idx, val) => {
+                        const qualityPoints = [...data.procedure.qualityPoints];
+                        qualityPoints[idx] = val;
+                        setData((prev) => ({ ...prev, procedure: { ...prev.procedure, qualityPoints } }));
+                      }}
+                      onUpdateGeneral={(idx, val) => {
+                        const generalInstructions = [...data.procedure.generalInstructions];
+                        generalInstructions[idx] = val;
+                        setData((prev) => ({ ...prev, procedure: { ...prev.procedure, generalInstructions } }));
+                      }}
+                    />
+                  </div>
+                </main>
               </div>
             </div>
           )}
-        </aside>
 
-        {/* Sidebar Toggle Handle */}
-        <button
-          type="button"
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="no-print absolute left-[420px] lg:left-[480px] top-4 z-30 bg-white border border-slate-300 rounded-r-lg p-1.5 shadow-md hover:bg-slate-100 text-slate-600 transition cursor-pointer"
-          style={{ left: isSidebarOpen ? undefined : 0 }}
-          title={isSidebarOpen ? 'Collapse Input Panel' : 'Expand Input Panel'}
-        >
-          {isSidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        </button>
-
-        {/* Right Side: Live A4 Landscape Canvas */}
-        <main className="flex-1 bg-slate-300/80 overflow-auto flex flex-col items-center justify-start p-6 md:p-10 relative">
-          {/* Quick Floating Document Bar */}
-          <div className="no-print mb-4 flex flex-wrap items-center justify-center gap-3 bg-white/95 backdrop-blur-xs px-4 py-2 rounded-xl shadow-md border border-slate-200 text-xs shrink-0 z-10">
-            {/* Step Font Size Adjust */}
-            <div className="flex items-center gap-1.5">
-              <span className="flex items-center gap-1 font-semibold text-slate-700">
-                <Type className="w-3.5 h-3.5 text-blue-600" />
-                <span>Procedure Font:</span>
-              </span>
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                {(
-                  [
-                    { id: 'auto', label: 'Auto' },
-                    { id: 'compact', label: 'Compact' },
-                    { id: 'normal', label: 'Normal' },
-                    { id: 'large', label: 'Large' },
-                    { id: 'xlarge', label: 'XL' },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setData((prev) => ({ ...prev, stepFontSize: opt.id }))}
-                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
-                      (data.stepFontSize || 'auto') === opt.id
-                        ? 'bg-blue-600 text-white shadow-xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+          {/* VIEW 4: APPROVAL ROUTE PIPELINE VIEW */}
+          {currentView === 'approval_route' && (
+            <div className="p-4 sm:p-6 lg:p-8 animate-in fade-in duration-200">
+              <ApprovalRouteView
+                currentUser={currentUser}
+                onOpenSopInEditor={(sop) => {
+                  setData(sop);
+                  if (sop.concernId) {
+                    const c = getConcernById(sop.concernId);
+                    if (c) setActiveConcern(c);
+                  }
+                  setCurrentView('editor');
+                }}
+                onOpenLogin={() => setIsLoginModalOpen(true)}
+              />
             </div>
+          )}
 
-            <div className="h-4 w-px bg-slate-200 hidden sm:block" />
-
-            {/* Quality Points Font Size Adjust */}
-            <div className="flex items-center gap-1.5">
-              <span className="flex items-center gap-1 font-semibold text-amber-800">
-                <Sparkles className="w-3 h-3 text-amber-500" />
-                <span>Key Points Font:</span>
-              </span>
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                {(
-                  [
-                    { id: 'auto', label: 'Auto' },
-                    { id: 'compact', label: 'Compact' },
-                    { id: 'normal', label: 'Normal' },
-                    { id: 'large', label: 'Large' },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setData((prev) => ({ ...prev, qualityFontSize: opt.id }))}
-                    className={`px-1.5 py-0.5 rounded text-[10.5px] font-medium transition cursor-pointer ${
-                      (data.qualityFontSize || 'auto') === opt.id
-                        ? 'bg-amber-600 text-white shadow-xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+          {/* VIEW 5: MASTER TECHNICAL ARCHIVE */}
+          {currentView === 'archive' && (
+            <div className="p-4 sm:p-6 lg:p-8 animate-in fade-in duration-200">
+              <MasterArchiveModal
+                isOpen={true}
+                onClose={() => setCurrentView('dashboard')}
+                currentUser={currentUser}
+                onSelectSop={(sop) => {
+                  setData(sop);
+                  if (sop.concernId) {
+                    const c = getConcernById(sop.concernId);
+                    if (c) setActiveConcern(c);
+                  }
+                  setCurrentView('editor');
+                }}
+              />
             </div>
+          )}
 
-            <div className="h-4 w-px bg-slate-200 hidden sm:block" />
-
-            {/* Photo Grid Columns */}
-            <div className="flex items-center gap-1.5">
-              <span className="flex items-center gap-1 font-semibold text-slate-700">
-                <LayoutGrid className="w-3.5 h-3.5 text-blue-600" />
-                <span>Columns:</span>
-              </span>
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                {(
-                  [
-                    { id: 0, label: 'Auto' },
-                    { id: 2, label: '2 Columns' },
-                    { id: 3, label: '3 Columns' },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setData((prev) => ({ ...prev, gridCols: opt.id }))}
-                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
-                      (data.gridCols || 0) === opt.id
-                        ? 'bg-blue-600 text-white shadow-xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+          {/* VIEW 6: PLANT-WIDE ANALYTICS & KPIS */}
+          {currentView === 'analytics' && (
+            <div className="p-4 sm:p-6 lg:p-8 animate-in fade-in duration-200">
+              <AnalyticsDashboardModal
+                isOpen={true}
+                onClose={() => setCurrentView('dashboard')}
+              />
             </div>
-
-            <div className="h-4 w-px bg-slate-200 hidden sm:block" />
-
-            {/* Image Fit */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-semibold text-slate-700">Image Fit:</span>
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                {(
-                  [
-                    { id: 'contain', label: 'Contain' },
-                    { id: 'cover', label: 'Cover' },
-                  ] as const
-                ).map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setData((prev) => ({ ...prev, imageFit: opt.id }))}
-                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer ${
-                      (data.imageFit || 'contain') === opt.id
-                        ? 'bg-blue-600 text-white shadow-xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div
-            id="sop-paper-wrapper"
-            className="transition-transform duration-200 origin-top shadow-2xl rounded-xs print:shadow-none"
-            style={{
-              transform: `scale(${zoom})`,
-            }}
-          >
-            <SOPPaper
-              data={data}
-              onUpdateHeader={(updates) =>
-                setData((prev) => ({ ...prev, header: { ...prev.header, ...updates } }))
-              }
-              onUpdateFontSize={(size) => setData((prev) => ({ ...prev, stepFontSize: size }))}
-              onUpdateStep={(idx, val) => {
-                const steps = [...data.procedure.steps];
-                steps[idx] = val;
-                setData((prev) => ({ ...prev, procedure: { ...prev.procedure, steps } }));
-              }}
-              onUpdateQuality={(idx, val) => {
-                const qualityPoints = [...data.procedure.qualityPoints];
-                qualityPoints[idx] = val;
-                setData((prev) => ({ ...prev, procedure: { ...prev.procedure, qualityPoints } }));
-              }}
-              onUpdateGeneral={(idx, val) => {
-                const generalInstructions = [...data.procedure.generalInstructions];
-                generalInstructions[idx] = val;
-                setData((prev) => ({ ...prev, procedure: { ...prev.procedure, generalInstructions } }));
-              }}
-            />
-          </div>
+          )}
         </main>
       </div>
-
-      {/* Master Archive / Prepared-by Grouped SOP Modal */}
-      <MasterArchiveModal
-        isOpen={isMasterArchiveOpen}
-        onClose={() => setIsMasterArchiveOpen(false)}
-        currentUser={currentUser}
-        onSelectSop={(sop) => setData(sop)}
-      />
 
       {/* Authentication Login Modal */}
       <LoginModal
@@ -1021,15 +1224,16 @@ export const App: React.FC = () => {
         isOpen={isWorkspaceModalOpen}
         onClose={() => setIsWorkspaceModalOpen(false)}
         currentUser={currentUser}
-        onSelectSop={(sop) => setData(sop)}
+        onSelectSop={(sop) => {
+          setData(sop);
+          if (sop.concernId) {
+            const c = getConcernById(sop.concernId);
+            if (c) setActiveConcern(c);
+          }
+          setCurrentView('editor');
+        }}
         onNewSop={handleNewSop}
         onOpenLogin={() => setIsLoginModalOpen(true)}
-      />
-
-      {/* Analytics & Performance Dashboard Modal */}
-      <AnalyticsDashboardModal
-        isOpen={isAnalyticsModalOpen}
-        onClose={() => setIsAnalyticsModalOpen(false)}
       />
 
       {/* Admin Panel Modal */}
@@ -1037,6 +1241,29 @@ export const App: React.FC = () => {
         isOpen={isAdminModalOpen}
         onClose={() => setIsAdminModalOpen(false)}
         currentUser={currentUser}
+      />
+
+      {/* Direct AI Engine & API Key Modal */}
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        openRouterKey={openRouterKey}
+        openRouterModel={openRouterModel}
+        geminiKey={geminiKey}
+        activeProvider={activeProvider}
+        onSaveConfig={(cfg) => {
+          setOpenRouterKey(cfg.openRouterKey);
+          setOpenRouterModel(cfg.openRouterModel);
+          setGeminiKey(cfg.geminiKey);
+          setActiveProvider(cfg.activeProvider);
+          saveGlobalAiConfig({
+            openRouterKey: cfg.openRouterKey,
+            openRouterModel: cfg.openRouterModel,
+            geminiKey: cfg.geminiKey,
+            activeProvider: cfg.activeProvider,
+          });
+          setIsApiKeyModalOpen(false);
+        }}
       />
     </div>
   );

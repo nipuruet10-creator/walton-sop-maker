@@ -140,7 +140,7 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
       <div className="border-b-2 border-black w-full shrink-0">
         <div className="flex flex-row divide-x-2 divide-black w-full">
           {/* Company Brand (Left 50%) */}
-          <div className="w-1/2 flex flex-col divide-y border-black">
+          <div className="w-1/2 flex flex-col divide-y-2 divide-black">
             {/* Logo and Company Name */}
             <div className="flex flex-row items-center gap-3 px-3 py-1.5 bg-white min-h-[46px]">
               <img
@@ -154,7 +154,7 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
             </div>
 
             {/* Process Name (Editable Inline) */}
-            <div className="flex flex-row divide-x border-black text-[11px]">
+            <div className="flex flex-row divide-x-2 divide-black text-[11px]">
               <div className="w-[28%] font-bold px-2 py-1 bg-slate-50 flex items-center shrink-0">
                 Process Name
               </div>
@@ -170,7 +170,7 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
             </div>
 
             {/* Model (Editable Inline) */}
-            <div className="flex flex-row divide-x border-black text-[11px]">
+            <div className="flex flex-row divide-x-2 divide-black text-[11px]">
               <div className="w-[28%] font-bold px-2 py-1 bg-slate-50 flex items-center shrink-0">
                 Model
               </div>
@@ -248,7 +248,7 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
               <div className="w-[55%] flex flex-row divide-x divide-black">
                 {/* Prepared By */}
                 <div className="flex-1 flex flex-col justify-between p-0.5 bg-white text-[8.5px] min-h-[58px] overflow-hidden">
-                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50 shrink-0 leading-tight">
+                  <div className="font-bold text-center border-b border-black pb-0.5 bg-slate-50 shrink-0 leading-tight">
                     Prepared By
                     <span className="block text-[7px] text-slate-600 font-normal">Process concern</span>
                   </div>
@@ -272,7 +272,7 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
 
                 {/* Checked By */}
                 <div className="flex-1 flex flex-col justify-between p-0.5 bg-white text-[8.5px] min-h-[58px] overflow-hidden">
-                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50 shrink-0 leading-tight">
+                  <div className="font-bold text-center border-b border-black pb-0.5 bg-slate-50 shrink-0 leading-tight">
                     Checked By
                     <span className="block text-[7px] text-slate-600 font-normal">Section In charge</span>
                   </div>
@@ -293,7 +293,7 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
 
                 {/* Approved By */}
                 <div className="flex-1 flex flex-col justify-between p-0.5 bg-white text-[8.5px] min-h-[58px] overflow-hidden">
-                  <div className="font-bold text-center border-b border-black/30 pb-0.5 bg-slate-50 shrink-0 leading-tight">
+                  <div className="font-bold text-center border-b border-black pb-0.5 bg-slate-50 shrink-0 leading-tight">
                     Approved By
                     <span className="block text-[7px] text-slate-600 font-normal">Process HOD</span>
                   </div>
@@ -516,12 +516,12 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
                 <th className="w-16 py-0.5 text-[8.5px]">Gas</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-black/60">
+            <tbody className="divide-y divide-black">
               {parts.slice(0, 3).map((p, idx) => (
-                <tr key={idx} className="h-[12px] leading-none">
-                  <td className="border-r border-black/60 font-bold">{p.sl}</td>
-                  <td className="border-r border-black/60 px-1 text-left truncate">{p.name}</td>
-                  <td className="border-r border-black/60 px-1">{p.capacity}</td>
+                <tr key={idx} className="h-[12px] leading-none border-b border-black">
+                  <td className="border-r border-black font-bold">{p.sl}</td>
+                  <td className="border-r border-black px-1 text-left truncate">{p.name}</td>
+                  <td className="border-r border-black px-1">{p.capacity}</td>
                   <td className="px-1">{p.gas}</td>
                 </tr>
               ))}
@@ -542,11 +542,11 @@ export const SOPPaper: React.FC<SOPPaperProps> = ({
                 <th className="w-32 py-0.5 text-[8.5px]">Effective Range</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-black/60">
+            <tbody className="divide-y divide-black">
               {tools.slice(0, 3).map((t, idx) => (
-                <tr key={idx} className="h-[12px] leading-none">
-                  <td className="border-r border-black/60 font-bold">{t.sl}</td>
-                  <td className="border-r border-black/60 px-1 text-left truncate">{t.name}</td>
+                <tr key={idx} className="h-[12px] leading-none border-b border-black">
+                  <td className="border-r border-black font-bold">{t.sl}</td>
+                  <td className="border-r border-black px-1 text-left truncate">{t.name}</td>
                   <td className="px-1 truncate">{t.effectiveRange}</td>
                 </tr>
               ))}

@@ -15,26 +15,26 @@ export const OPENROUTER_MODEL_STORAGE = 'walton_sop_openrouter_model';
 // Fallback high-quality free models list (active and fast on OpenRouter)
 export const DEFAULT_FREE_MODELS: OpenRouterModel[] = [
   {
-    id: 'google/gemma-4-26b-a4b-it:free',
-    name: 'Google: Gemma 4 26B (Free - Ultra Fast & Recommended)',
+    id: 'google/gemma-2-9b-it:free',
+    name: 'Google: Gemma 2 9B (Free - Fast & High Bengali Accuracy)',
     isFree: true,
     description: 'Fast Google reasoning model with outstanding Bengali multilingual skills and instant JSON formatting',
   },
   {
-    id: 'qwen/qwen3.8-27b:free',
-    name: 'Qwen: Qwen 3.8 27B (Free - High Accuracy)',
+    id: 'meta-llama/llama-3.3-70b-instruct:free',
+    name: 'Meta: Llama 3.3 70B (Free - Ultra High Accuracy)',
     isFree: true,
-    description: 'Top-tier Asian multilingual model with exceptional Bengali translation speed',
+    description: 'Top-tier 70B reasoning model with exceptional instruction following and Bengali fluency',
   },
   {
-    id: 'google/gemma-4-31b-it:free',
-    name: 'Google: Gemma 4 31B (Free)',
+    id: 'qwen/qwen-2.5-72b-instruct:free',
+    name: 'Qwen: Qwen 2.5 72B (Free - Advanced Multilingual)',
     isFree: true,
-    description: 'Google state-of-the-art open model with outstanding Bengali multilingual skills',
+    description: 'Premier multilingual model with high Bengali grammar mastery and factory terms knowledge',
   },
   {
-    id: 'nvidia/nemotron-3.5-lightning:free',
-    name: 'NVIDIA: Nemotron 3.5 Lightning (Free - Fastest)',
+    id: 'meta-llama/llama-3.1-8b-instruct:free',
+    name: 'Meta: Llama 3.1 8B (Free - Ultra Fast)',
     isFree: true,
     description: 'Ultra-low latency model for lightning-fast generations',
   },
@@ -91,10 +91,10 @@ export async function fetchFreeOpenRouterModels(apiKey?: string): Promise<OpenRo
 
     // Sort so recommended fast models are on top:
     const priorityList = [
-      'google/gemma-4-26b-a4b-it:free',
-      'qwen/qwen3.8-27b:free',
-      'google/gemma-4-31b-it:free',
-      'nvidia/nemotron-3.5-lightning:free',
+      'google/gemma-2-9b-it:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'qwen/qwen-2.5-72b-instruct:free',
+      'meta-llama/llama-3.1-8b-instruct:free',
       'openrouter/free',
     ];
 
@@ -451,11 +451,11 @@ You MUST respond ONLY with a valid JSON object in this exact structure, with NO 
   // Prioritized candidate models for fast generation and zero failure
   const candidateModels = Array.from(
     new Set([
-      model || 'google/gemma-4-26b-a4b-it:free',
-      'google/gemma-4-26b-a4b-it:free',
-      'qwen/qwen3.8-27b:free',
-      'google/gemma-4-31b-it:free',
-      'nvidia/nemotron-3.5-lightning:free',
+      model || 'google/gemma-2-9b-it:free',
+      'google/gemma-2-9b-it:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'qwen/qwen-2.5-72b-instruct:free',
+      'meta-llama/llama-3.1-8b-instruct:free',
       'openrouter/free',
     ])
   ).filter(Boolean);
@@ -562,11 +562,11 @@ RULES (ভাষা ও পরিভাষা ব্যবহারের নি
 
   const candidateModels = Array.from(
     new Set([
-      model || 'google/gemma-4-26b-a4b-it:free',
-      'google/gemma-4-26b-a4b-it:free',
-      'qwen/qwen3.8-27b:free',
-      'google/gemma-4-31b-it:free',
-      'nvidia/nemotron-3.5-lightning:free',
+      model || 'google/gemma-2-9b-it:free',
+      'google/gemma-2-9b-it:free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'qwen/qwen-2.5-72b-instruct:free',
+      'meta-llama/llama-3.1-8b-instruct:free',
       'openrouter/free',
     ])
   ).filter(Boolean);
